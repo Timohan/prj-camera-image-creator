@@ -5,6 +5,7 @@
 #include "../math/camera.h"
 #include "floor.h"
 #include "cube.h"
+#include "cameraobject.h"
 
 class BaseScene
 {
@@ -20,6 +21,7 @@ private:
     Camera m_camera;
     Floor m_floor;
     Cube m_cube;
+    CameraObject m_cameraObject;
 
     void setupLight();
     void setupVisualPosition();

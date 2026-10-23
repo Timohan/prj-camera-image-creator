@@ -13,8 +13,18 @@
 // ambient light is 0.25 of the spot light
 #define AMBIENT_LIGHT_FACTOR    0.25f
 
+static VECTOR3 vector3(float x, float y, float z)
+{
+    VECTOR3 v;
+    v.x = x;
+    v.y = y;
+    v.z = z;
+    return v;
+}
+
 BaseScene::BaseScene() :
-    m_cube(-3.0f, 0.0f, 3.0f, 0.5f, 0.5f, 0.5f)
+    m_cube(-3.0f, 0.0f, 3.0f, 0.5f, 0.5f, 0.5f),
+    m_cameraObject(vector3(3.0f, 0.5f, 3.0f), m_cube.getCenter(), 0.6f, 0.6f, 0.6f)
 {
     setupVisualPosition();
 }
@@ -30,7 +40,8 @@ int BaseScene::initCustomShader()
     }
     glUseProgram(m_shader.generalShader() );
     if (m_floor.init()
-        || m_cube.init()) {
+        || m_cube.init()
+        || m_cameraObject.init()) {
         return 1;
     }
     return 0;
@@ -55,6 +66,7 @@ void BaseScene::customRender(float width, float height)
 
     m_floor.render();
     m_cube.render();
+    m_cameraObject.render();
     glDisable(GL_DEPTH_TEST);
 }
 
