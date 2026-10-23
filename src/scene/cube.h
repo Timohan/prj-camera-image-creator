@@ -3,6 +3,7 @@
 
 #include <GL/glew.h>
 #include <GL/gl.h>
+#include "../math/math3d.h"
 
 class Cube
 {
@@ -12,6 +13,7 @@ public:
 
     int init();
     void render();
+    VECTOR3 getCenter() const;
 
 private:
     float m_x, m_y, m_z;

@@ -16,6 +16,7 @@ TgApplication *getApplication();
 struct FloorVertice
 {
     float x, y, z;
+    float nx, ny, nz;
     float s, t;
     float r, g, b, a;
 };
@@ -57,13 +58,13 @@ int Floor::init()
             const float s0 = (x % 2) ? 1.0f : 0.0f;
             const float s1 = 1.0f - s0;
 
-            listVertices.push_back( { x0, 0.0f, z1,   s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-            listVertices.push_back( { x1, 0.0f, z1,   s1, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-            listVertices.push_back( { x1, 0.0f, z0,   s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x1, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s1, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
 
-            listVertices.push_back( { x0, 0.0f, z1,   s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-            listVertices.push_back( { x1, 0.0f, z0,   s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
-            listVertices.push_back( { x0, 0.0f, z0,   s0, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x0, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s0, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
         }
     }
 
@@ -75,11 +76,13 @@ int Floor::init()
     glBindBuffer(GL_ARRAY_BUFFER, m_vertexBufferObject);
     glBufferData(GL_ARRAY_BUFFER, sizeof(FloorVertice)*m_verticesCount, listVertices.data(), GL_STATIC_DRAW);
 
-    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition], 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<void*>(0));
+    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition], 3, GL_FLOAT, GL_FALSE, 12 * sizeof(float), reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition]);
-    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord], 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
+    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribNormal], 3, GL_FLOAT, GL_FALSE, 12 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
+    glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribNormal]);
+    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord], 2, GL_FLOAT, GL_FALSE, 12 * sizeof(float), reinterpret_cast<void*>(6 * sizeof(float)));
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord]);
-    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor], 4, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<void*>(5 * sizeof(float)));
+    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor], 4, GL_FLOAT, GL_FALSE, 12 * sizeof(float), reinterpret_cast<void*>(8 * sizeof(float)));
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor]);
     glBindVertexArray(0);
 
@@ -102,6 +105,7 @@ void Floor::render()
     glEnable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE0);
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition]);
+    glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribNormal]);
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord]);
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor]);
     glBindTexture(GL_TEXTURE_2D, m_textureIndex);

@@ -12,7 +12,7 @@
 #include "camera_shader.h"
 #include <iostream>
 
-GLuint CameraShader::m_shaderAttributeIndex[3] = {0,0,0};
+GLuint CameraShader::m_shaderAttributeIndex[4] = {0,0,0,0};
 
 /*!
  * \brief CameraShader::m_vertShader
@@ -20,8 +20,11 @@ GLuint CameraShader::m_shaderAttributeIndex[3] = {0,0,0};
  * simple 3D vertex shader
  */
 const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
+        "attribute vec3 normal;" \
         "attribute vec2 tex_coord;" \
         "attribute vec4 color;" \
+        "varying vec3 worldPosition;" \
+        "varying vec3 worldNormal;" \
         "varying vec2 texCoord;" \
         "varying vec4 colorLight;" \
         "uniform mat4 view;" \
@@ -29,9 +32,11 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
         "uniform vec3 transformPosition;" \
         "void main()" \
         "{" \
+        "    worldNormal             = normal;" \
         "    texCoord                = tex_coord;" \
         "    colorLight              = color;" \
         "    vec3 pos                = transformPosition+vertex;" \
+        "    worldPosition           = pos;" \
         "    gl_Position             = projection*(view*(vec4(pos, 1.0)));" \
         "}";
 /*!
@@ -41,11 +46,25 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
  */
 const char *CameraShader::m_fragShader = "" \
         "uniform sampler2D texture;" \
+        "uniform vec3 lightPosition;" \
+        "uniform vec3 lightDirection;" \
+        "uniform vec3 lightColor;" \
+        "uniform float lightCosInner;" \
+        "uniform float lightCosOuter;" \
+        "uniform float ambientFactor;" \
+        "varying vec3 worldPosition;" \
+        "varying vec3 worldNormal;" \
         "varying vec2 texCoord;" \
         "varying vec4 colorLight;" \
         "void main()" \
         "{" \
-        "       gl_FragColor = texture2D(texture, texCoord)*colorLight;" \
+        "       vec3 toLight  = normalize(lightPosition-worldPosition);" \
+        "       float diffuse = max(dot(normalize(worldNormal), toLight), 0.0);" \
+        "       float cosAngle = dot(-toLight, normalize(lightDirection));" \
+        "       float spot    = smoothstep(lightCosOuter, lightCosInner, cosAngle);" \
+        "       vec3 light    = lightColor*(ambientFactor + diffuse*spot);" \
+        "       vec4 color    = texture2D(texture, texCoord)*colorLight;" \
+        "       gl_FragColor  = vec4(color.rgb*light, color.a);" \
         "}";
 /*!
  * \brief CameraShader::CameraShader
@@ -115,6 +134,7 @@ int CameraShader::init()
     }
     m_generalShader = shaderHandle;
     m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition] = glGetAttribLocation(shaderHandle, "vertex");
+    m_shaderAttributeIndex[ShaderAttributes3d::AttribNormal] = glGetAttribLocation(shaderHandle, "normal");
     m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord] = glGetAttribLocation(shaderHandle, "tex_coord");
     m_shaderAttributeIndex[ShaderAttributes3d::AttribColor] = glGetAttribLocation(shaderHandle, "color");
     return 0;

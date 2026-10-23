@@ -21,6 +21,7 @@ private:
     Floor m_floor;
     Cube m_cube;
 
+    void setupLight();
     void setupVisualPosition();
 };
 

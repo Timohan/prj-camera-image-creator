@@ -2,6 +2,7 @@
 #include "../shader/camera_shader.h"
 #include <application/tg_application.h>
 #include <vector>
+#include <math.h>
 
 TgApplication *getApplication();
 
@@ -12,6 +13,7 @@ TgApplication *getApplication();
 struct CubeVertice
 {
     float x, y, z;
+    float nx, ny, nz;
     float s, t;
     float r, g, b, a;
 };
@@ -59,8 +61,16 @@ int Cube::init()
     auto addFace = [&listVertices](const float c[4][3]) {
         const float st[4][2] = { {0, 0}, {1, 0}, {1, 1}, {0, 1} };
         const int order[6] = { 0, 1, 2, 0, 2, 3 };
+        // outward normal of the face
+        const float e1[3] = { c[1][0]-c[0][0], c[1][1]-c[0][1], c[1][2]-c[0][2] };
+        const float e2[3] = { c[2][0]-c[1][0], c[2][1]-c[1][1], c[2][2]-c[1][2] };
+        float n[3] = { e1[1]*e2[2]-e1[2]*e2[1], e1[2]*e2[0]-e1[0]*e2[2], e1[0]*e2[1]-e1[1]*e2[0] };
+        const float len = sqrtf(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+        n[0] /= len;
+        n[1] /= len;
+        n[2] /= len;
         for (int i : order) {
-            listVertices.push_back( { c[i][0], c[i][1], c[i][2], st[i][0], st[i][1], 1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { c[i][0], c[i][1], c[i][2], n[0], n[1], n[2], st[i][0], st[i][1], 1.0f, 1.0f, 1.0f, 1.0f } );
         }
     };
     const float front[4][3]  = { {x1, y0, z0}, {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0} };
@@ -84,11 +94,13 @@ int Cube::init()
     glBindBuffer(GL_ARRAY_BUFFER, m_vertexBufferObject);
     glBufferData(GL_ARRAY_BUFFER, sizeof(CubeVertice)*m_verticesCount, listVertices.data(), GL_STATIC_DRAW);
 
-    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition], 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<void*>(0));
+    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition], 3, GL_FLOAT, GL_FALSE, 12 * sizeof(float), reinterpret_cast<void*>(0));
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition]);
-    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord], 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
+    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribNormal], 3, GL_FLOAT, GL_FALSE, 12 * sizeof(float), reinterpret_cast<void*>(3 * sizeof(float)));
+    glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribNormal]);
+    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord], 2, GL_FLOAT, GL_FALSE, 12 * sizeof(float), reinterpret_cast<void*>(6 * sizeof(float)));
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord]);
-    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor], 4, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<void*>(5 * sizeof(float)));
+    glVertexAttribPointer(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor], 4, GL_FLOAT, GL_FALSE, 12 * sizeof(float), reinterpret_cast<void*>(8 * sizeof(float)));
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor]);
     glBindVertexArray(0);
 
@@ -105,12 +117,26 @@ int Cube::init()
     return 0;
 }
 
+/*!
+ * \brief Cube::getCenter
+ * \return middle point of the cube
+ */
+VECTOR3 Cube::getCenter() const
+{
+    VECTOR3 center;
+    center.x = m_x;
+    center.y = m_y + m_height/2.0f;
+    center.z = m_z;
+    return center;
+}
+
 void Cube::render()
 {
     glBindVertexArray(m_vertexArrayObject);
     glEnable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE0);
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition]);
+    glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribNormal]);
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord]);
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor]);
     glBindTexture(GL_TEXTURE_2D, m_textureIndex);
