@@ -17,10 +17,13 @@ public:
 
     int initCustomShader();
     void customRender(float width, float height);
+    void moveToCamera(int index);
 
 private:
     CameraShader m_shader;
     Camera m_camera;
+    VECTOR3 m_basePosition;
+    VECTOR3 m_baseDirection;
     Floor m_floor;
     Cube m_cube;
     CameraObject *m_listCameraObject;

@@ -113,15 +113,37 @@ void BaseScene::setupLight()
     glUniform1f(glGetUniformLocation(shader, "ambientFactor"), AMBIENT_LIGHT_FACTOR);
 }
 
-void BaseScene::setupVisualPosition()
+/*!
+ * \brief BaseScene::moveToCamera
+ * moves the camera to position and direction of the base camera or camera object
+ * \param index 0 is the base camera, 1-n is camera object 0-(n-1)
+ */
+void BaseScene::moveToCamera(int index)
 {
-    GeneralConfig config;
-    VECTOR3 upVector;
+    VECTOR3 position, direction, upVector;
 
-    // if reading fails, config keeps the default camera
-    config.read(CONFIGS_PATH "general.ini");
+    if (index == 0) {
+        position = m_basePosition;
+        direction = m_baseDirection;
+    } else if (index > 0 && index <= m_cameraCount) {
+        position = m_listCameraObject[index-1].getPosition();
+        direction = m_listCameraObject[index-1].getDirection();
+    } else {
+        return;
+    }
     upVector.x = 0;
     upVector.y = 1.0f;
     upVector.z = 0;
-    m_camera.setup(config.getBasePosition(), config.getBaseDirection(), upVector);
+    m_camera.setup(position, direction, upVector);
+}
+
+void BaseScene::setupVisualPosition()
+{
+    GeneralConfig config;
+
+    // if reading fails, config keeps the default camera
+    config.read(CONFIGS_PATH "general.ini");
+    m_basePosition = config.getBasePosition();
+    m_baseDirection = config.getBaseDirection();
+    moveToCamera(0);
 }

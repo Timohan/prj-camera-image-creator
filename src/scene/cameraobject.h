@@ -17,6 +17,9 @@ public:
     ~CameraObject();
 
     void setup(VECTOR3 position, VECTOR3 direction, float sizeRate);
+    VECTOR3 getPosition() const;
+    VECTOR3 getDirection() const;
+
     int init();
     void render();
 

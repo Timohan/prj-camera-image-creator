@@ -47,6 +47,20 @@ void CameraObject::setup(VECTOR3 position, VECTOR3 direction, float sizeRate)
     m_sizeRate = sizeRate;
 }
 
+VECTOR3 CameraObject::getPosition() const
+{
+    return m_position;
+}
+
+/*!
+ * \brief CameraObject::getDirection
+ * \return normalized direction
+ */
+VECTOR3 CameraObject::getDirection() const
+{
+    return Math3D::Vec3Normalize(m_direction);
+}
+
 CameraObject::~CameraObject()
 {
     if (m_vertexArrayObject) {

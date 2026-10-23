@@ -3,6 +3,7 @@
 
 #include <window/tg_mainwindow.h>
 #include "scene/base_scene.h"
+#include "scene/camera_key_listener.h"
 
 class MainWindow : public TgMainWindow
 {
@@ -15,6 +16,7 @@ protected:
 
 private:
     BaseScene m_baseScene;
+    CameraKeyListener m_cameraKeyListener;
 };
 
 #endif
