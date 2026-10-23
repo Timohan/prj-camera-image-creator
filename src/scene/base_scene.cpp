@@ -23,7 +23,8 @@ BaseScene::BaseScene() :
     m_directionLineVisible(true),
     m_cube(-3.0f, 0.0f, 3.0f, 0.5f, 0.5f, 0.5f),
     m_listCameraObject(nullptr),
-    m_cameraCount(0)
+    m_cameraCount(0),
+    m_cameraObjectsVisible(true)
 {
     setupVisualPosition();
     createCameraObjects();
@@ -75,8 +76,10 @@ void BaseScene::customRender(float width, float height)
         m_directionLine.render();
     }
     m_cube.render();
-    for (int i=0;i<m_cameraCount;i++) {
-        m_listCameraObject[i].render();
+    if (m_cameraObjectsVisible) {
+        for (int i=0;i<m_cameraCount;i++) {
+            m_listCameraObject[i].render();
+        }
     }
     glDisable(GL_DEPTH_TEST);
 }
@@ -149,6 +152,15 @@ void BaseScene::moveToCamera(int index)
 void BaseScene::toggleDirectionLine()
 {
     m_directionLineVisible = !m_directionLineVisible;
+}
+
+/*!
+ * \brief BaseScene::toggleCameraObjects
+ * shows the camera object cones if they are hidden and hides them if they are visible
+ */
+void BaseScene::toggleCameraObjects()
+{
+    m_cameraObjectsVisible = !m_cameraObjectsVisible;
 }
 
 void BaseScene::setupVisualPosition()

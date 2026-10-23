@@ -20,6 +20,7 @@ public:
     void customRender(float width, float height);
     void moveToCamera(int index);
     void toggleDirectionLine();
+    void toggleCameraObjects();
 
 private:
     CameraShader m_shader;
@@ -32,6 +33,7 @@ private:
     Cube m_cube;
     CameraObject *m_listCameraObject;
     int m_cameraCount;
+    bool m_cameraObjectsVisible;
 
     void createCameraObjects();
     void setupLight();

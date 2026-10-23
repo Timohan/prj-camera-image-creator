@@ -15,6 +15,11 @@ void CameraKeyListener::connectOnToggleDirectionLine(std::function<void()> toggl
     m_toggleDirectionLine = toggleDirectionLine;
 }
 
+void CameraKeyListener::connectOnToggleCameraObjects(std::function<void()> toggleCameraObjects)
+{
+    m_toggleCameraObjects = toggleCameraObjects;
+}
+
 TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWindowInfo *windowInfo)
 {
     if (eventData->m_type == TgEventType::EventTypeCharacterCallback
@@ -31,6 +36,14 @@ TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWin
         && eventData->m_event.m_keyEvent.m_key == 'l') {
         if (m_toggleDirectionLine) {
             m_toggleDirectionLine();
+        }
+        return TgEventResult::EventResultCompleted;
+    }
+    if (eventData->m_type == TgEventType::EventTypeCharacterCallback
+        && eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_NormalKey
+        && eventData->m_event.m_keyEvent.m_key == 'c') {
+        if (m_toggleCameraObjects) {
+            m_toggleCameraObjects();
         }
         return TgEventResult::EventResultCompleted;
     }
