@@ -8,21 +8,22 @@
 /*!
  * \brief CameraObject
  * Camera drawn as a right-angled (rectangular) cone. The rectangle area is
- * the lens that is pointed to the target, apex is behind the camera.
+ * the lens that is pointed to the direction, apex is behind the camera.
  */
 class CameraObject
 {
 public:
-    explicit CameraObject(VECTOR3 position, VECTOR3 target, float width, float height, float deep);
+    explicit CameraObject();
     ~CameraObject();
 
+    void setup(VECTOR3 position, VECTOR3 direction, float sizeRate);
     int init();
     void render();
 
 private:
     VECTOR3 m_position;
-    VECTOR3 m_target;
-    float m_width, m_height, m_deep;
+    VECTOR3 m_direction;
+    float m_sizeRate;
     GLuint m_vertexArrayObject;
     GLuint m_vertexBufferObject;
     GLuint m_textureIndex;

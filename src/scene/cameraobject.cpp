@@ -2,12 +2,18 @@
 #include "../shader/camera_shader.h"
 #include <application/tg_application.h>
 #include <vector>
+#include <math.h>
 
 TgApplication *getApplication();
 
 #ifndef IMAGES_PATH
 #define IMAGES_PATH         "images/"
 #endif
+
+// size of the cone when sizeRate is 1
+#define CAMERA_OBJECT_WIDTH     0.6f
+#define CAMERA_OBJECT_HEIGHT    0.6f
+#define CAMERA_OBJECT_DEEP      0.6f
 
 struct CameraObjectVertice
 {
@@ -17,25 +23,28 @@ struct CameraObjectVertice
     float r, g, b, a;
 };
 
-/*!
- * \brief CameraObject::CameraObject
- * \param position middle of the rectangle area (lens) of the cone
- * \param target the rectangle area is pointed to this position
- * \param width width of the rectangle area
- * \param height height of the rectangle area
- * \param deep distance from the rectangle area to the apex
- */
-CameraObject::CameraObject(VECTOR3 position, VECTOR3 target, float width, float height, float deep) :
-    m_position(position),
-    m_target(target),
-    m_width(width),
-    m_height(height),
-    m_deep(deep),
+CameraObject::CameraObject() :
+    m_sizeRate(1.0f),
     m_vertexArrayObject(0),
     m_vertexBufferObject(0),
     m_textureIndex(0),
     m_verticesCount(0)
 {
+    m_position = { 0.0f, 0.0f, 0.0f };
+    m_direction = { 0.0f, 0.0f, 1.0f };
+}
+
+/*!
+ * \brief CameraObject::setup
+ * \param position middle of the rectangle area (lens) of the cone
+ * \param direction the rectangle area is pointed to this direction
+ * \param sizeRate size of the cone compared to the default size (0.5 = half size)
+ */
+void CameraObject::setup(VECTOR3 position, VECTOR3 direction, float sizeRate)
+{
+    m_position = position;
+    m_direction = direction;
+    m_sizeRate = sizeRate;
 }
 
 CameraObject::~CameraObject()
@@ -50,15 +59,17 @@ CameraObject::~CameraObject()
 
 int CameraObject::init()
 {
-    VECTOR3 up;
-    up.x = 0.0f;
-    up.y = 1.0f;
-    up.z = 0.0f;
-    const VECTOR3 forward = Math3D::Vec3Normalize(Math3D::decreaceVector(m_target, m_position));
+    VECTOR3 up = { 0.0f, 1.0f, 0.0f };
+    const VECTOR3 forward = Math3D::Vec3Normalize(m_direction);
+    if (fabsf(forward.y) > 0.999f) {
+        // looking straight up or down, cannot use y as up vector
+        up = { 0.0f, 0.0f, 1.0f };
+    }
     const VECTOR3 right = Math3D::Vec3Normalize(Math3D::Vec3Cross(up, forward));
     const VECTOR3 top = Math3D::Vec3Cross(forward, right);
-    const float halfW = m_width/2.0f;
-    const float halfH = m_height/2.0f;
+    const float halfW = CAMERA_OBJECT_WIDTH*m_sizeRate/2.0f;
+    const float halfH = CAMERA_OBJECT_HEIGHT*m_sizeRate/2.0f;
+    const float deep = CAMERA_OBJECT_DEEP*m_sizeRate;
 
     auto point = [this, &right, &top](float w, float h) {
         VECTOR3 p;
@@ -70,9 +81,9 @@ int CameraObject::init()
     // base corners (counter-clockwise looking from the target) and apex behind the base
     const VECTOR3 c[4] = { point(halfW, -halfH), point(-halfW, -halfH), point(-halfW, halfH), point(halfW, halfH) };
     VECTOR3 apex;
-    apex.x = m_position.x - forward.x*m_deep;
-    apex.y = m_position.y - forward.y*m_deep;
-    apex.z = m_position.z - forward.z*m_deep;
+    apex.x = m_position.x - forward.x*deep;
+    apex.y = m_position.y - forward.y*deep;
+    apex.z = m_position.z - forward.z*deep;
 
     std::vector<CameraObjectVertice> listVertices;
     // adds a triangle with outward normal, p0, p1, p2 are counter-clockwise looking from outside

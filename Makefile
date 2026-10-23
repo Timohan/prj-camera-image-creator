@@ -21,6 +21,7 @@ LDFLAGS:=$(PKGFLAGS) -lGL -lGLEW -lglfw
 # set current make dir
 CURRENT_DIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 CXXFLAGS+=-DIMAGES_PATH=\"$(CURRENT_DIR)images/\"
+CXXFLAGS+=-DCONFIGS_PATH=\"$(CURRENT_DIR)configs/\"
 
 src_SRCDIR:=$(CURRENT_DIR)src
 src_SRCS:=$(wildcard $(src_SRCDIR)/*.cpp)

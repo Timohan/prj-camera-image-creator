@@ -12,6 +12,8 @@ class BaseScene
 public:
     BaseScene();
     ~BaseScene();
+    BaseScene(const BaseScene &) = delete;
+    BaseScene &operator=(const BaseScene &) = delete;
 
     int initCustomShader();
     void customRender(float width, float height);
@@ -21,8 +23,10 @@ private:
     Camera m_camera;
     Floor m_floor;
     Cube m_cube;
-    CameraObject m_cameraObject;
+    CameraObject *m_listCameraObject;
+    int m_cameraCount;
 
+    void createCameraObjects();
     void setupLight();
     void setupVisualPosition();
 };

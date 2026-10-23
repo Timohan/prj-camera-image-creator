@@ -1,7 +1,13 @@
 #include "base_scene.h"
 #include "../math/math3d.h"
+#include "cameraobjects_config.h"
+#include "general_config.h"
 
 // vertical field of view, wide enough to see the floor below the camera
+#ifndef CONFIGS_PATH
+#define CONFIGS_PATH            "configs/"
+#endif
+
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 
 // spot light is at 3/3/-3 and points to the middle of the cube
@@ -13,24 +19,18 @@
 // ambient light is 0.25 of the spot light
 #define AMBIENT_LIGHT_FACTOR    0.25f
 
-static VECTOR3 vector3(float x, float y, float z)
-{
-    VECTOR3 v;
-    v.x = x;
-    v.y = y;
-    v.z = z;
-    return v;
-}
-
 BaseScene::BaseScene() :
     m_cube(-3.0f, 0.0f, 3.0f, 0.5f, 0.5f, 0.5f),
-    m_cameraObject(vector3(3.0f, 0.5f, 3.0f), m_cube.getCenter(), 0.6f, 0.6f, 0.6f)
+    m_listCameraObject(nullptr),
+    m_cameraCount(0)
 {
     setupVisualPosition();
+    createCameraObjects();
 }
 
 BaseScene::~BaseScene()
 {
+    delete[] m_listCameraObject;
 }
 
 int BaseScene::initCustomShader()
@@ -40,9 +40,13 @@ int BaseScene::initCustomShader()
     }
     glUseProgram(m_shader.generalShader() );
     if (m_floor.init()
-        || m_cube.init()
-        || m_cameraObject.init()) {
+        || m_cube.init()) {
         return 1;
+    }
+    for (int i=0;i<m_cameraCount;i++) {
+        if (m_listCameraObject[i].init()) {
+            return 1;
+        }
     }
     return 0;
 }
@@ -66,8 +70,28 @@ void BaseScene::customRender(float width, float height)
 
     m_floor.render();
     m_cube.render();
-    m_cameraObject.render();
+    for (int i=0;i<m_cameraCount;i++) {
+        m_listCameraObject[i].render();
+    }
     glDisable(GL_DEPTH_TEST);
+}
+
+/*!
+ * \brief BaseScene::createCameraObjects
+ * creates camera objects from cameraobjects.ini
+ */
+void BaseScene::createCameraObjects()
+{
+    CameraObjectsConfig config;
+
+    if (!config.read(CONFIGS_PATH "cameraobjects.ini")) {
+        return;
+    }
+    m_cameraCount = config.getCameraCount();
+    m_listCameraObject = new CameraObject[m_cameraCount];
+    for (int i=0;i<m_cameraCount;i++) {
+        m_listCameraObject[i].setup(config.getCamera(i).position, config.getCamera(i).direction, config.getSizeRate());
+    }
 }
 
 void BaseScene::setupLight()
@@ -91,16 +115,13 @@ void BaseScene::setupLight()
 
 void BaseScene::setupVisualPosition()
 {
-    VECTOR3 eye, direction, upVector;
+    GeneralConfig config;
+    VECTOR3 upVector;
 
-    eye.x = 0.0f;
-    eye.y = 1.0f;
-    eye.z = 0.0f;
-    direction.x = 0.0f;
-    direction.y = 0.0f;
-    direction.z = 1.0f;
+    // if reading fails, config keeps the default camera
+    config.read(CONFIGS_PATH "general.ini");
     upVector.x = 0;
     upVector.y = 1.0f;
     upVector.z = 0;
-    m_camera.setup(eye, direction, upVector);
+    m_camera.setup(config.getBasePosition(), config.getBaseDirection(), upVector);
 }
