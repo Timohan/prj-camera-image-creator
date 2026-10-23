@@ -15,9 +15,12 @@ public:
     bool read(const std::string &filename);
 
     const std::string &getFilename() const;
+    bool hasKey(const std::string &key) const;
     bool getFloat(const std::string &key, float *value) const;
     // vector is written as x/y/z
     bool getVector(const std::string &key, VECTOR3 *vector) const;
+    // list is written as a/b/c..., it must have exactly count values
+    bool getFloats(const std::string &key, float *values, int count) const;
 
 private:
     std::string m_filename;

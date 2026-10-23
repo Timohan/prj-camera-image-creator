@@ -52,6 +52,11 @@ const std::string &IniFile::getFilename() const
     return m_filename;
 }
 
+bool IniFile::hasKey(const std::string &key) const
+{
+    return m_values.find(key) != m_values.end();
+}
+
 bool IniFile::getFloat(const std::string &key, float *value) const
 {
     auto it = m_values.find(key);
@@ -60,17 +65,34 @@ bool IniFile::getFloat(const std::string &key, float *value) const
 
 bool IniFile::getVector(const std::string &key, VECTOR3 *vector) const
 {
+    float values[3];
+    if (!getFloats(key, values, 3)) {
+        return false;
+    }
+    vector->x = values[0];
+    vector->y = values[1];
+    vector->z = values[2];
+    return true;
+}
+
+bool IniFile::getFloats(const std::string &key, float *values, int count) const
+{
     auto it = m_values.find(key);
     if (it == m_values.end()) {
         return false;
     }
     const std::string &text = it->second;
-    const size_t first = text.find('/');
-    const size_t second = first == std::string::npos ? first : text.find('/', first + 1);
-    if (second == std::string::npos) {
-        return false;
+    size_t begin = 0;
+    for (int i=0;i<count;i++) {
+        const size_t end = text.find('/', begin);
+        if ((end == std::string::npos) != (i == count-1)) {
+            // too few or too many values
+            return false;
+        }
+        if (!parseFloat(trim(text.substr(begin, end == std::string::npos ? end : end - begin)), &values[i])) {
+            return false;
+        }
+        begin = end + 1;
     }
-    return parseFloat(trim(text.substr(0, first)), &vector->x)
-        && parseFloat(trim(text.substr(first + 1, second - first - 1)), &vector->y)
-        && parseFloat(trim(text.substr(second + 1)), &vector->z);
+    return true;
 }

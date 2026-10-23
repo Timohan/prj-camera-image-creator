@@ -34,6 +34,7 @@ private:
     CameraObject *m_listCameraObject;
     int m_cameraCount;
     bool m_cameraObjectsVisible;
+    int m_cameraIndex;
 
     void createCameraObjects();
     void setupLight();

@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 #include "../math/math3d.h"
+#include "cameraobjects_config.h"
 
 /*!
  * \brief CameraObject
@@ -16,21 +17,25 @@ public:
     explicit CameraObject();
     ~CameraObject();
 
-    void setup(VECTOR3 position, VECTOR3 direction, float sizeRate);
+    void setup(const CameraObjectConfig &config, float sizeRate);
     VECTOR3 getPosition() const;
     VECTOR3 getDirection() const;
+    VECTOR3 getUpVector() const;
+    float getAspectRatio() const;
+    Matrix4x4 getProjectionMatrix(float zNear, float zFar) const;
 
     int init();
     void render();
 
 private:
-    VECTOR3 m_position;
-    VECTOR3 m_direction;
+    CameraObjectConfig m_config;
     float m_sizeRate;
     GLuint m_vertexArrayObject;
     GLuint m_vertexBufferObject;
     GLuint m_textureIndex;
     int m_verticesCount;
+
+    void getAxes(VECTOR3 *right, VECTOR3 *top) const;
 };
 
 #endif // CAMERA_OBJECT_H

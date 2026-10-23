@@ -28,6 +28,7 @@ void Camera::setup(VECTOR3 vPosition, VECTOR3 vDirection, VECTOR3 vUpVector)
     m_vPosition = vPosition;
     m_vDirection = vDirection;
     m_vDirection = Math3D::Vec3Normalize(m_vDirection);
+    m_vUpVector = vUpVector;
 }
 
 void Camera::fixEyePosition()
@@ -63,12 +64,7 @@ Matrix4x4 Camera::getViewMatrix()
     pAt.y = m_vDirection.y + m_vPosition.y;
     pAt.z = m_vDirection.z + m_vPosition.z;
 
-    VECTOR3 vUpVector;
-    vUpVector.x = 0.0f;
-    vUpVector.y = 1.0f;
-    vUpVector.z = 0.0f;
-
-    Math3D::MatrixLookAtLH(&view,m_vPosition,pAt,vUpVector);
+    Math3D::MatrixLookAtLH(&view,m_vPosition,pAt,m_vUpVector);
     return view;
 }
 

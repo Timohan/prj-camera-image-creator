@@ -9,6 +9,8 @@
 #endif
 
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
+#define CAMERA_NEAR_PLANE       0.1f
+#define CAMERA_FAR_PLANE        100.0f
 
 // spot light is at 3/3/-3 and points to the middle of the cube
 #define SPOT_LIGHT_X            3.0f
@@ -24,7 +26,8 @@ BaseScene::BaseScene() :
     m_cube(-3.0f, 0.0f, 3.0f, 0.5f, 0.5f, 0.5f),
     m_listCameraObject(nullptr),
     m_cameraCount(0),
-    m_cameraObjectsVisible(true)
+    m_cameraObjectsVisible(true),
+    m_cameraIndex(0)
 {
     setupVisualPosition();
     createCameraObjects();
@@ -61,7 +64,23 @@ void BaseScene::customRender(float width, float height)
     Matrix4x4 mvp;
     const int tranformPosition = glGetUniformLocation(m_shader.generalShader(), "transformPosition");
 
-    Math3D::MatrixPerspectiveFovLH(&mvp, CAMERA_FIELD_OF_VIEW, width/height, 0.1f, 100.0f);
+    if (m_cameraIndex > 0) {
+        // camera object view uses the lens of the camera object and the aspect ratio of its resolution
+        const CameraObject &cameraObject = m_listCameraObject[m_cameraIndex-1];
+        const float aspectRatio = cameraObject.getAspectRatio();
+        float viewportWidth = width;
+        float viewportHeight = height;
+        if (width/height > aspectRatio) {
+            viewportWidth = height*aspectRatio;
+        } else {
+            viewportHeight = width/aspectRatio;
+        }
+        glViewport(static_cast<GLint>((width-viewportWidth)/2.0f), static_cast<GLint>((height-viewportHeight)/2.0f),
+                   static_cast<GLsizei>(viewportWidth), static_cast<GLsizei>(viewportHeight));
+        mvp = cameraObject.getProjectionMatrix(CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
+    } else {
+        Math3D::MatrixPerspectiveFovLH(&mvp, CAMERA_FIELD_OF_VIEW, width/height, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE);
+    }
     viewMatrix = m_camera.getViewMatrix();
 
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "projection"), 1, GL_FALSE,  mvp.m );
@@ -82,6 +101,7 @@ void BaseScene::customRender(float width, float height)
         }
     }
     glDisable(GL_DEPTH_TEST);
+    glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
 }
 
 /*!
@@ -98,7 +118,7 @@ void BaseScene::createCameraObjects()
     m_cameraCount = config.getCameraCount();
     m_listCameraObject = new CameraObject[m_cameraCount];
     for (int i=0;i<m_cameraCount;i++) {
-        m_listCameraObject[i].setup(config.getCamera(i).position, config.getCamera(i).direction, config.getSizeRate());
+        m_listCameraObject[i].setup(config.getCamera(i), config.getSizeRate());
     }
 }
 
@@ -123,7 +143,8 @@ void BaseScene::setupLight()
 
 /*!
  * \brief BaseScene::moveToCamera
- * moves the camera to position and direction of the base camera or camera object
+ * moves the camera to position and direction of the base camera or camera object,
+ * camera object view uses also the roll and the lens of the camera object
  * \param index 0 is the base camera, 1-n is camera object 0-(n-1)
  */
 void BaseScene::moveToCamera(int index)
@@ -133,15 +154,17 @@ void BaseScene::moveToCamera(int index)
     if (index == 0) {
         position = m_basePosition;
         direction = m_baseDirection;
+        upVector.x = 0;
+        upVector.y = 1.0f;
+        upVector.z = 0;
     } else if (index > 0 && index <= m_cameraCount) {
         position = m_listCameraObject[index-1].getPosition();
         direction = m_listCameraObject[index-1].getDirection();
+        upVector = m_listCameraObject[index-1].getUpVector();
     } else {
         return;
     }
-    upVector.x = 0;
-    upVector.y = 1.0f;
-    upVector.z = 0;
+    m_cameraIndex = index;
     m_camera.setup(position, direction, upVector);
 }
 
