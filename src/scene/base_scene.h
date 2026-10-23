@@ -4,6 +4,7 @@
 #include "../shader/camera_shader.h"
 #include "../math/camera.h"
 #include "floor.h"
+#include "cube.h"
 
 class BaseScene
 {
@@ -18,6 +19,7 @@ private:
     CameraShader m_shader;
     Camera m_camera;
     Floor m_floor;
+    Cube m_cube;
 
     void setupVisualPosition();
 };

@@ -4,7 +4,8 @@
 // vertical field of view, wide enough to see the floor below the camera
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 
-BaseScene::BaseScene()
+BaseScene::BaseScene() :
+    m_cube(-3.0f, 0.0f, 3.0f, 0.5f, 0.5f, 0.5f)
 {
     setupVisualPosition();
 }
@@ -19,7 +20,8 @@ int BaseScene::initCustomShader()
         return 1;
     }
     glUseProgram(m_shader.generalShader() );
-    if (m_floor.init()) {
+    if (m_floor.init()
+        || m_cube.init()) {
         return 1;
     }
     return 0;
@@ -38,9 +40,12 @@ void BaseScene::customRender(float width, float height)
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "projection"), 1, GL_FALSE,  mvp.m );
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "view"), 1, GL_FALSE, viewMatrix.m );
     glUniform3f(tranformPosition, 0, 0, 0 );
+    glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
     m_floor.render();
+    m_cube.render();
+    glDisable(GL_DEPTH_TEST);
 }
 
 void BaseScene::setupVisualPosition()
