@@ -3,7 +3,7 @@
 
 #include "../shader/camera_shader.h"
 #include "../math/camera.h"
-#include "triangle.h"
+#include "floor.h"
 
 class BaseScene
 {
@@ -17,7 +17,7 @@ public:
 private:
     CameraShader m_shader;
     Camera m_camera;
-    Triangle m_triangle;
+    Floor m_floor;
 
     void setupVisualPosition();
 };

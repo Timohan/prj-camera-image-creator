@@ -1,7 +1,7 @@
 #include "base_scene.h"
 #include "../math/math3d.h"
 
-// vertical field of view, wide enough to see the triangle on the floor below the camera
+// vertical field of view, wide enough to see the floor below the camera
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 
 BaseScene::BaseScene()
@@ -19,7 +19,7 @@ int BaseScene::initCustomShader()
         return 1;
     }
     glUseProgram(m_shader.generalShader() );
-    if (m_triangle.init()) {
+    if (m_floor.init()) {
         return 1;
     }
     return 0;
@@ -32,7 +32,7 @@ void BaseScene::customRender(float width, float height)
     Matrix4x4 mvp;
     const int tranformPosition = glGetUniformLocation(m_shader.generalShader(), "transformPosition");
 
-    Math3D::MatrixPerspectiveFovLH(&mvp, CAMERA_FIELD_OF_VIEW, width/height, 0.1f, 10.0f);
+    Math3D::MatrixPerspectiveFovLH(&mvp, CAMERA_FIELD_OF_VIEW, width/height, 0.1f, 100.0f);
     viewMatrix = m_camera.getViewMatrix();
 
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "projection"), 1, GL_FALSE,  mvp.m );
@@ -40,7 +40,7 @@ void BaseScene::customRender(float width, float height)
     glUniform3f(tranformPosition, 0, 0, 0 );
     glDisable(GL_CULL_FACE);
 
-    m_triangle.render();
+    m_floor.render();
 }
 
 void BaseScene::setupVisualPosition()

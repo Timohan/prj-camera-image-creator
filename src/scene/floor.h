@@ -1,14 +1,14 @@
-#ifndef TRIANGLE_H
-#define TRIANGLE_H
+#ifndef FLOOR_H
+#define FLOOR_H
 
 #include <GL/glew.h>
 #include <GL/gl.h>
 
-class Triangle
+class Floor
 {
 public:
-    explicit Triangle();
-    ~Triangle();
+    explicit Floor();
+    ~Floor();
 
     int init();
     void render();
@@ -16,7 +16,8 @@ public:
 private:
     GLuint m_vertexArrayObject;
     GLuint m_vertexBufferObject;
+    GLuint m_textureIndex;
     int m_verticesCount;
 };
 
-#endif // TRIANGLE_H
+#endif // FLOOR_H

@@ -12,7 +12,7 @@
 #include "camera_shader.h"
 #include <iostream>
 
-GLuint CameraShader::m_shaderAttributeIndex[2] = {0,0};
+GLuint CameraShader::m_shaderAttributeIndex[3] = {0,0,0};
 
 /*!
  * \brief CameraShader::m_vertShader
@@ -20,13 +20,16 @@ GLuint CameraShader::m_shaderAttributeIndex[2] = {0,0};
  * simple 3D vertex shader
  */
 const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
+        "attribute vec2 tex_coord;" \
         "attribute vec4 color;" \
+        "varying vec2 texCoord;" \
         "varying vec4 colorLight;" \
         "uniform mat4 view;" \
         "uniform mat4 projection;" \
         "uniform vec3 transformPosition;" \
         "void main()" \
         "{" \
+        "    texCoord                = tex_coord;" \
         "    colorLight              = color;" \
         "    vec3 pos                = transformPosition+vertex;" \
         "    gl_Position             = projection*(view*(vec4(pos, 1.0)));" \
@@ -37,10 +40,12 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
  * fragment shader
  */
 const char *CameraShader::m_fragShader = "" \
+        "uniform sampler2D texture;" \
+        "varying vec2 texCoord;" \
         "varying vec4 colorLight;" \
         "void main()" \
         "{" \
-        "       gl_FragColor = colorLight;" \
+        "       gl_FragColor = texture2D(texture, texCoord)*colorLight;" \
         "}";
 /*!
  * \brief CameraShader::CameraShader
@@ -110,6 +115,7 @@ int CameraShader::init()
     }
     m_generalShader = shaderHandle;
     m_shaderAttributeIndex[ShaderAttributes3d::AttribPosition] = glGetAttribLocation(shaderHandle, "vertex");
+    m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord] = glGetAttribLocation(shaderHandle, "tex_coord");
     m_shaderAttributeIndex[ShaderAttributes3d::AttribColor] = glGetAttribLocation(shaderHandle, "color");
     return 0;
 }

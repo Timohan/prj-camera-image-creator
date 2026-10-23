@@ -18,6 +18,7 @@
 enum ShaderAttributes3d
 {
     AttribPosition = 0,
+    AttribTextCoord,
     AttribColor
 };
 
@@ -31,7 +32,7 @@ public:
 
     GLuint generalShader();
 
-    static GLuint m_shaderAttributeIndex[2];
+    static GLuint m_shaderAttributeIndex[3];
 private:
     static const char *m_vertShader;
     static const char *m_fragShader;
