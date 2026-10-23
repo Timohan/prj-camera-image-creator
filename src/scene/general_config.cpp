@@ -8,6 +8,8 @@ GeneralConfig::GeneralConfig()
 {
     m_basePosition = { 0.0f, 1.0f, 0.0f };
     m_baseDirection = { 0.0f, 0.0f, 1.0f };
+    m_directionLineWidth = 0.1f;
+    m_directionLineHeight = 0.001f;
 }
 
 /*!
@@ -19,6 +21,7 @@ bool GeneralConfig::read(const std::string &filename)
 {
     IniFile ini;
     VECTOR3 position, direction;
+    float lineWidth, lineHeight;
 
     if (!ini.read(filename)) {
         return false;
@@ -32,6 +35,16 @@ bool GeneralConfig::read(const std::string &filename)
         std::cerr << filename << ": baseObjectDirection is missing or invalid" << std::endl;
         return false;
     }
+    if (!ini.getFloat("directionLineWidth", &lineWidth) || lineWidth <= 0.0f) {
+        std::cerr << filename << ": directionLineWidth is missing or not positive" << std::endl;
+        return false;
+    }
+    if (!ini.getFloat("directionLinePositionHeight", &lineHeight)) {
+        std::cerr << filename << ": directionLinePositionHeight is missing or invalid" << std::endl;
+        return false;
+    }
+    m_directionLineWidth = lineWidth/MM_TO_OPENGL_UNIT;
+    m_directionLineHeight = lineHeight/MM_TO_OPENGL_UNIT;
     m_basePosition.x = position.x/MM_TO_OPENGL_UNIT;
     m_basePosition.y = position.y/MM_TO_OPENGL_UNIT;
     m_basePosition.z = position.z/MM_TO_OPENGL_UNIT;
@@ -47,4 +60,14 @@ VECTOR3 GeneralConfig::getBasePosition() const
 VECTOR3 GeneralConfig::getBaseDirection() const
 {
     return m_baseDirection;
+}
+
+float GeneralConfig::getDirectionLineWidth() const
+{
+    return m_directionLineWidth;
+}
+
+float GeneralConfig::getDirectionLineHeight() const
+{
+    return m_directionLineHeight;
 }

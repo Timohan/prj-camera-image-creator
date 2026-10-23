@@ -8,6 +8,9 @@ MainWindow::MainWindow(int width, int height)
     m_cameraKeyListener.connectOnCameraSelected([this](int index) {
         m_baseScene.moveToCamera(index);
     });
+    m_cameraKeyListener.connectOnToggleDirectionLine([this]() {
+        m_baseScene.toggleDirectionLine();
+    });
 }
 
 int MainWindow::initCustomShader()

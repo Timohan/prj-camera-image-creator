@@ -20,6 +20,7 @@
 #define AMBIENT_LIGHT_FACTOR    0.25f
 
 BaseScene::BaseScene() :
+    m_directionLineVisible(true),
     m_cube(-3.0f, 0.0f, 3.0f, 0.5f, 0.5f, 0.5f),
     m_listCameraObject(nullptr),
     m_cameraCount(0)
@@ -40,6 +41,7 @@ int BaseScene::initCustomShader()
     }
     glUseProgram(m_shader.generalShader() );
     if (m_floor.init()
+        || m_directionLine.init()
         || m_cube.init()) {
         return 1;
     }
@@ -69,6 +71,9 @@ void BaseScene::customRender(float width, float height)
     glDisable(GL_CULL_FACE);
 
     m_floor.render();
+    if (m_directionLineVisible) {
+        m_directionLine.render();
+    }
     m_cube.render();
     for (int i=0;i<m_cameraCount;i++) {
         m_listCameraObject[i].render();
@@ -137,6 +142,15 @@ void BaseScene::moveToCamera(int index)
     m_camera.setup(position, direction, upVector);
 }
 
+/*!
+ * \brief BaseScene::toggleDirectionLine
+ * shows the direction line if it is hidden and hides it if it is visible
+ */
+void BaseScene::toggleDirectionLine()
+{
+    m_directionLineVisible = !m_directionLineVisible;
+}
+
 void BaseScene::setupVisualPosition()
 {
     GeneralConfig config;
@@ -145,5 +159,6 @@ void BaseScene::setupVisualPosition()
     config.read(CONFIGS_PATH "general.ini");
     m_basePosition = config.getBasePosition();
     m_baseDirection = config.getBaseDirection();
+    m_directionLine.setup(config.getDirectionLineWidth(), config.getDirectionLineHeight());
     moveToCamera(0);
 }

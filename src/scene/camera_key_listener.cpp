@@ -10,6 +10,11 @@ void CameraKeyListener::connectOnCameraSelected(std::function<void(int index)> c
     m_cameraSelected = cameraSelected;
 }
 
+void CameraKeyListener::connectOnToggleDirectionLine(std::function<void()> toggleDirectionLine)
+{
+    m_toggleDirectionLine = toggleDirectionLine;
+}
+
 TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWindowInfo *windowInfo)
 {
     if (eventData->m_type == TgEventType::EventTypeCharacterCallback
@@ -18,6 +23,14 @@ TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWin
         && eventData->m_event.m_keyEvent.m_key <= '6') {
         if (m_cameraSelected) {
             m_cameraSelected(static_cast<int>(eventData->m_event.m_keyEvent.m_key - '0'));
+        }
+        return TgEventResult::EventResultCompleted;
+    }
+    if (eventData->m_type == TgEventType::EventTypeCharacterCallback
+        && eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_NormalKey
+        && eventData->m_event.m_keyEvent.m_key == 'l') {
+        if (m_toggleDirectionLine) {
+            m_toggleDirectionLine();
         }
         return TgEventResult::EventResultCompleted;
     }

@@ -5,6 +5,7 @@
 #include "../math/camera.h"
 #include "floor.h"
 #include "cube.h"
+#include "direction_line.h"
 #include "cameraobject.h"
 
 class BaseScene
@@ -18,6 +19,7 @@ public:
     int initCustomShader();
     void customRender(float width, float height);
     void moveToCamera(int index);
+    void toggleDirectionLine();
 
 private:
     CameraShader m_shader;
@@ -25,6 +27,8 @@ private:
     VECTOR3 m_basePosition;
     VECTOR3 m_baseDirection;
     Floor m_floor;
+    DirectionLine m_directionLine;
+    bool m_directionLineVisible;
     Cube m_cube;
     CameraObject *m_listCameraObject;
     int m_cameraCount;
