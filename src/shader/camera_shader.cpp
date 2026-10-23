@@ -14,6 +14,9 @@
 
 GLuint CameraShader::m_shaderAttributeIndex[4] = {0,0,0,0};
 
+#define SHADER_VALUE_TEXT(value)    #value
+#define SHADER_VALUE(value)         SHADER_VALUE_TEXT(value)
+
 /*!
  * \brief CameraShader::m_vertShader
  *
@@ -42,27 +45,35 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
 /*!
  * \brief CameraShader::m_fragShader
  *
- * fragment shader
+ * fragment shader, ambient light and up to CAMERA_SHADER_MAX_SPOT_LIGHTS spot lights
  */
 const char *CameraShader::m_fragShader = "" \
+        "#define MAX_SPOT_LIGHTS " SHADER_VALUE(CAMERA_SHADER_MAX_SPOT_LIGHTS) "\n" \
         "uniform sampler2D texture;" \
-        "uniform vec3 lightPosition;" \
-        "uniform vec3 lightDirection;" \
-        "uniform vec3 lightColor;" \
-        "uniform float lightCosInner;" \
-        "uniform float lightCosOuter;" \
-        "uniform float ambientFactor;" \
+        "uniform int lightCount;" \
+        "uniform vec3 lightPosition[MAX_SPOT_LIGHTS];" \
+        "uniform vec3 lightDirection[MAX_SPOT_LIGHTS];" \
+        "uniform vec3 lightColor[MAX_SPOT_LIGHTS];" \
+        "uniform float lightCosInner[MAX_SPOT_LIGHTS];" \
+        "uniform float lightCosOuter[MAX_SPOT_LIGHTS];" \
+        "uniform vec3 ambientLight;" \
         "varying vec3 worldPosition;" \
         "varying vec3 worldNormal;" \
         "varying vec2 texCoord;" \
         "varying vec4 colorLight;" \
         "void main()" \
         "{" \
-        "       vec3 toLight  = normalize(lightPosition-worldPosition);" \
-        "       float diffuse = max(dot(normalize(worldNormal), toLight), 0.0);" \
-        "       float cosAngle = dot(-toLight, normalize(lightDirection));" \
-        "       float spot    = smoothstep(lightCosOuter, lightCosInner, cosAngle);" \
-        "       vec3 light    = lightColor*(ambientFactor + diffuse*spot);" \
+        "       vec3 normal   = normalize(worldNormal);" \
+        "       vec3 light    = ambientLight;" \
+        "       for (int i=0;i<MAX_SPOT_LIGHTS;i++) {" \
+        "           if (i < lightCount) {" \
+        "               vec3 toLight   = normalize(lightPosition[i]-worldPosition);" \
+        "               float diffuse  = max(dot(normal, toLight), 0.0);" \
+        "               float cosAngle = dot(-toLight, normalize(lightDirection[i]));" \
+        "               float spot     = smoothstep(lightCosOuter[i], lightCosInner[i], cosAngle);" \
+        "               light          += lightColor[i]*diffuse*spot;" \
+        "           }" \
+        "       }" \
         "       vec4 color    = texture2D(texture, texCoord)*colorLight;" \
         "       gl_FragColor  = vec4(color.rgb*light, color.a);" \
         "}";

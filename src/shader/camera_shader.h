@@ -15,6 +15,9 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 
+// maximum count of spot lights in the shader
+#define CAMERA_SHADER_MAX_SPOT_LIGHTS   8
+
 enum ShaderAttributes3d
 {
     AttribPosition = 0,

@@ -7,6 +7,8 @@
 #include "cube.h"
 #include "direction_line.h"
 #include "cameraobject.h"
+#include "objects_config.h"
+#include <vector>
 
 class BaseScene
 {
@@ -30,13 +32,17 @@ private:
     Floor m_floor;
     DirectionLine m_directionLine;
     bool m_directionLineVisible;
-    Cube m_cube;
+    Cube *m_listCube;
+    int m_cubeCount;
+    std::vector<SpotLightConfig> m_listSpotLight;
+    VECTOR3 m_ambientLight;
     CameraObject *m_listCameraObject;
     int m_cameraCount;
     bool m_cameraObjectsVisible;
     int m_cameraIndex;
 
     void createCameraObjects();
+    void createObjects();
     void setupLight();
     void setupVisualPosition();
 };

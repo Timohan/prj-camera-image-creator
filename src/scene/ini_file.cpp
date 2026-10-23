@@ -32,6 +32,7 @@ bool IniFile::read(const std::string &filename)
 
     m_filename = filename;
     m_values.clear();
+    m_listValues.clear();
     if (!file.is_open()) {
         std::cerr << "Cannot open " << filename << std::endl;
         return false;
@@ -42,7 +43,10 @@ bool IniFile::read(const std::string &filename)
         if (line.empty() || line[0] == '#' || equal == std::string::npos) {
             continue;
         }
-        m_values[trim(line.substr(0, equal))] = trim(line.substr(equal + 1));
+        const std::string key = trim(line.substr(0, equal));
+        const std::string value = trim(line.substr(equal + 1));
+        m_values[key] = value;
+        m_listValues.push_back(std::make_pair(key, value));
     }
     return true;
 }
@@ -78,10 +82,11 @@ bool IniFile::getVector(const std::string &key, VECTOR3 *vector) const
 bool IniFile::getFloats(const std::string &key, float *values, int count) const
 {
     auto it = m_values.find(key);
-    if (it == m_values.end()) {
-        return false;
-    }
-    const std::string &text = it->second;
+    return it != m_values.end() && parseFloats(it->second, values, count);
+}
+
+bool IniFile::parseFloats(const std::string &text, float *values, int count)
+{
     size_t begin = 0;
     for (int i=0;i<count;i++) {
         const size_t end = text.find('/', begin);
@@ -95,4 +100,15 @@ bool IniFile::getFloats(const std::string &key, float *values, int count) const
         begin = end + 1;
     }
     return true;
+}
+
+std::vector<std::string> IniFile::getValues(const std::string &key) const
+{
+    std::vector<std::string> values;
+    for (const auto &keyValue : m_listValues) {
+        if (keyValue.first == key) {
+            values.push_back(keyValue.second);
+        }
+    }
+    return values;
 }

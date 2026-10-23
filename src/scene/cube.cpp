@@ -1,6 +1,7 @@
 #include "cube.h"
 #include "../shader/camera_shader.h"
 #include <application/tg_application.h>
+#include <string>
 #include <vector>
 #include <math.h>
 
@@ -18,18 +19,7 @@ struct CubeVertice
     float r, g, b, a;
 };
 
-/*!
- * \brief Cube::Cube
- * \param x, z center of the cube on the floor
- * \param y bottom of the cube
- */
-Cube::Cube(float x, float y, float z, float width, float height, float deep) :
-    m_x(x),
-    m_y(y),
-    m_z(z),
-    m_width(width),
-    m_height(height),
-    m_deep(deep),
+Cube::Cube() :
     m_vertexArrayObject(0),
     m_vertexBufferObject(0),
     m_textureIndex(0),
@@ -47,18 +37,47 @@ Cube::~Cube()
     }
 }
 
+/*!
+ * \brief Cube::setup
+ * \param config center position, size, yaw/pitch/roll and texture of the cube
+ */
+void Cube::setup(const CubeConfig &config)
+{
+    m_config = config;
+}
+
 int Cube::init()
 {
-    const float x0 = m_x - m_width/2.0f;
-    const float x1 = m_x + m_width/2.0f;
-    const float y0 = m_y;
-    const float y1 = m_y + m_height;
-    const float z0 = m_z - m_deep/2.0f;
-    const float z1 = m_z + m_deep/2.0f;
+    // corners are first relative to the center, they are rotated and moved to the position
+    const float x0 = -m_config.size.x/2.0f;
+    const float x1 = m_config.size.x/2.0f;
+    const float y0 = -m_config.size.y/2.0f;
+    const float y1 = m_config.size.y/2.0f;
+    const float z0 = -m_config.size.z/2.0f;
+    const float z1 = m_config.size.z/2.0f;
+    const float yaw = m_config.yaw*PI_VALUE/180.0f;
+    const float pitch = m_config.pitch*PI_VALUE/180.0f;
+    const float roll = m_config.roll*PI_VALUE/180.0f;
+    const VECTOR3 &position = m_config.position;
     std::vector<CubeVertice> listVertices;
 
+    // rotates roll first, then pitch and yaw, and moves to the position
+    auto transform = [=](const float c[3], float out[3]) {
+        const float rollX = c[0]*cosf(roll) + c[1]*sinf(roll);
+        const float rollY = -c[0]*sinf(roll) + c[1]*cosf(roll);
+        const float pitchY = rollY*cosf(pitch) + c[2]*sinf(pitch);
+        const float pitchZ = -rollY*sinf(pitch) + c[2]*cosf(pitch);
+        out[0] = position.x + rollX*cosf(yaw) + pitchZ*sinf(yaw);
+        out[1] = position.y + pitchY;
+        out[2] = position.z - rollX*sinf(yaw) + pitchZ*cosf(yaw);
+    };
+
     // every face has 4 corners given counter-clockwise when looking at the face from outside
-    auto addFace = [&listVertices](const float c[4][3]) {
+    auto addFace = [&listVertices, &transform](const float corners[4][3]) {
+        float c[4][3];
+        for (int i=0;i<4;i++) {
+            transform(corners[i], c[i]);
+        }
         const float st[4][2] = { {0, 0}, {1, 0}, {1, 1}, {0, 1} };
         const int order[6] = { 0, 1, 2, 0, 2, 3 };
         // outward normal of the face
@@ -104,7 +123,7 @@ int Cube::init()
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor]);
     glBindVertexArray(0);
 
-    m_textureIndex = getApplication()->getTextureIndex(IMAGES_PATH "wood.png");
+    m_textureIndex = getApplication()->getTextureIndex((std::string(IMAGES_PATH) + m_config.texture).c_str());
     if (!m_textureIndex) {
         return 1;
     }
@@ -115,19 +134,6 @@ int Cube::init()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
     return 0;
-}
-
-/*!
- * \brief Cube::getCenter
- * \return middle point of the cube
- */
-VECTOR3 Cube::getCenter() const
-{
-    VECTOR3 center;
-    center.x = m_x;
-    center.y = m_y + m_height/2.0f;
-    center.z = m_z;
-    return center;
 }
 
 void Cube::render()

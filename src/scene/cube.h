@@ -3,21 +3,20 @@
 
 #include <GL/glew.h>
 #include <GL/gl.h>
-#include "../math/math3d.h"
+#include "objects_config.h"
 
 class Cube
 {
 public:
-    explicit Cube(float x, float y, float z, float width, float height, float deep);
+    explicit Cube();
     ~Cube();
 
+    void setup(const CubeConfig &config);
     int init();
     void render();
-    VECTOR3 getCenter() const;
 
 private:
-    float m_x, m_y, m_z;
-    float m_width, m_height, m_deep;
+    CubeConfig m_config;
     GLuint m_vertexArrayObject;
     GLuint m_vertexBufferObject;
     GLuint m_textureIndex;

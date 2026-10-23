@@ -2,28 +2,25 @@
 #include "../math/math3d.h"
 #include "cameraobjects_config.h"
 #include "general_config.h"
+#include <iostream>
 
 // vertical field of view, wide enough to see the floor below the camera
 #ifndef CONFIGS_PATH
 #define CONFIGS_PATH            "configs/"
+#endif
+#ifndef OBJECTS_PATH
+#define OBJECTS_PATH            "objects/"
 #endif
 
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 #define CAMERA_NEAR_PLANE       0.1f
 #define CAMERA_FAR_PLANE        100.0f
 
-// spot light is at 3/3/-3 and points to the middle of the cube
-#define SPOT_LIGHT_X            3.0f
-#define SPOT_LIGHT_Y            3.0f
-#define SPOT_LIGHT_Z            -3.0f
-#define SPOT_LIGHT_INNER_ANGLE  (PI_VALUE*25.0f/180.0f)
-#define SPOT_LIGHT_OUTER_ANGLE  (PI_VALUE*35.0f/180.0f)
-// ambient light is 0.25 of the spot light
-#define AMBIENT_LIGHT_FACTOR    0.25f
-
 BaseScene::BaseScene() :
     m_directionLineVisible(true),
-    m_cube(-3.0f, 0.0f, 3.0f, 0.5f, 0.5f, 0.5f),
+    m_listCube(nullptr),
+    m_cubeCount(0),
+    m_ambientLight({ 0.0f, 0.0f, 0.0f }),
     m_listCameraObject(nullptr),
     m_cameraCount(0),
     m_cameraObjectsVisible(true),
@@ -31,11 +28,13 @@ BaseScene::BaseScene() :
 {
     setupVisualPosition();
     createCameraObjects();
+    createObjects();
 }
 
 BaseScene::~BaseScene()
 {
     delete[] m_listCameraObject;
+    delete[] m_listCube;
 }
 
 int BaseScene::initCustomShader()
@@ -45,9 +44,13 @@ int BaseScene::initCustomShader()
     }
     glUseProgram(m_shader.generalShader() );
     if (m_floor.init()
-        || m_directionLine.init()
-        || m_cube.init()) {
+        || m_directionLine.init()) {
         return 1;
+    }
+    for (int i=0;i<m_cubeCount;i++) {
+        if (m_listCube[i].init()) {
+            return 1;
+        }
     }
     for (int i=0;i<m_cameraCount;i++) {
         if (m_listCameraObject[i].init()) {
@@ -94,7 +97,9 @@ void BaseScene::customRender(float width, float height)
     if (m_directionLineVisible) {
         m_directionLine.render();
     }
-    m_cube.render();
+    for (int i=0;i<m_cubeCount;i++) {
+        m_listCube[i].render();
+    }
     if (m_cameraObjectsVisible) {
         for (int i=0;i<m_cameraCount;i++) {
             m_listCameraObject[i].render();
@@ -122,23 +127,56 @@ void BaseScene::createCameraObjects()
     }
 }
 
+/*!
+ * \brief BaseScene::createObjects
+ * creates cubes and spot lights from objects0.dat
+ */
+void BaseScene::createObjects()
+{
+    ObjectsConfig config;
+
+    const bool success = config.read(OBJECTS_PATH "objects0.dat");
+    // on failure ambient light is the default, so the floor is still visible
+    m_ambientLight = config.getAmbientLight();
+    if (!success) {
+        return;
+    }
+    m_cubeCount = config.getCubeCount();
+    m_listCube = new Cube[m_cubeCount];
+    for (int i=0;i<m_cubeCount;i++) {
+        m_listCube[i].setup(config.getCube(i));
+    }
+    for (int i=0;i<config.getSpotLightCount();i++) {
+        if (i == CAMERA_SHADER_MAX_SPOT_LIGHTS) {
+            std::cerr << "Only " << CAMERA_SHADER_MAX_SPOT_LIGHTS << " spot lights are used" << std::endl;
+            break;
+        }
+        m_listSpotLight.push_back(config.getSpotLight(i));
+    }
+}
+
 void BaseScene::setupLight()
 {
     const GLuint shader = m_shader.generalShader();
-    const VECTOR3 cubeCenter = m_cube.getCenter();
-    VECTOR3 direction;
+    const GLsizei count = static_cast<GLsizei>(m_listSpotLight.size());
+    std::vector<GLfloat> positions, directions, colors, cosInner, cosOuter;
 
-    direction.x = cubeCenter.x - SPOT_LIGHT_X;
-    direction.y = cubeCenter.y - SPOT_LIGHT_Y;
-    direction.z = cubeCenter.z - SPOT_LIGHT_Z;
-    direction = Math3D::Vec3Normalize(direction);
-
-    glUniform3f(glGetUniformLocation(shader, "lightPosition"), SPOT_LIGHT_X, SPOT_LIGHT_Y, SPOT_LIGHT_Z);
-    glUniform3f(glGetUniformLocation(shader, "lightDirection"), direction.x, direction.y, direction.z);
-    glUniform3f(glGetUniformLocation(shader, "lightColor"), 1.0f, 1.0f, 1.0f);
-    glUniform1f(glGetUniformLocation(shader, "lightCosInner"), cosf(SPOT_LIGHT_INNER_ANGLE));
-    glUniform1f(glGetUniformLocation(shader, "lightCosOuter"), cosf(SPOT_LIGHT_OUTER_ANGLE));
-    glUniform1f(glGetUniformLocation(shader, "ambientFactor"), AMBIENT_LIGHT_FACTOR);
+    for (const SpotLightConfig &light : m_listSpotLight) {
+        positions.insert(positions.end(), { light.position.x, light.position.y, light.position.z });
+        directions.insert(directions.end(), { light.direction.x, light.direction.y, light.direction.z });
+        colors.insert(colors.end(), { light.color.x, light.color.y, light.color.z });
+        cosInner.push_back(cosf(light.innerAngle*PI_VALUE/180.0f));
+        cosOuter.push_back(cosf(light.outerAngle*PI_VALUE/180.0f));
+    }
+    glUniform1i(glGetUniformLocation(shader, "lightCount"), count);
+    if (count > 0) {
+        glUniform3fv(glGetUniformLocation(shader, "lightPosition"), count, positions.data());
+        glUniform3fv(glGetUniformLocation(shader, "lightDirection"), count, directions.data());
+        glUniform3fv(glGetUniformLocation(shader, "lightColor"), count, colors.data());
+        glUniform1fv(glGetUniformLocation(shader, "lightCosInner"), count, cosInner.data());
+        glUniform1fv(glGetUniformLocation(shader, "lightCosOuter"), count, cosOuter.data());
+    }
+    glUniform3f(glGetUniformLocation(shader, "ambientLight"), m_ambientLight.x, m_ambientLight.y, m_ambientLight.z);
 }
 
 /*!
