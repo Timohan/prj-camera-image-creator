@@ -1,5 +1,6 @@
 #include "direction_line.h"
 #include "../shader/camera_shader.h"
+#include "floor.h"
 #include <application/tg_application.h>
 #include <vector>
 
@@ -10,7 +11,7 @@ TgApplication *getApplication();
 #endif
 
 // lines are as long as the floor
-#define DIRECTION_LINE_HALF_LENGTH  10.0f
+#define DIRECTION_LINE_HALF_LENGTH  FLOOR_HALF_SIZE
 
 struct DirectionLineVertice
 {
@@ -117,6 +118,10 @@ void DirectionLine::render()
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord]);
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor]);
     glBindTexture(GL_TEXTURE_2D, m_textureIndex);
+    // lines are very close to the floor, far away depth buffer cannot separate them without the offset
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-1.0f, -4.0f);
     glDrawArrays(GL_TRIANGLES, 0, m_verticesCount);
+    glDisable(GL_POLYGON_OFFSET_FILL);
     glBindVertexArray(0);
 }

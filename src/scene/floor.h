@@ -4,6 +4,9 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
 
+// floor reaches 5 km to every direction, about the distance to the horizon for human eyes on a flat ground
+#define FLOOR_HALF_SIZE     5000.0f
+
 class Floor
 {
 public:

@@ -9,9 +9,10 @@ TgApplication *getApplication();
 #define IMAGES_PATH         "images/"
 #endif
 
-#define FLOOR_HALF_SIZE     10.0f
-// floor is divided into FLOOR_TILE_COUNT x FLOOR_TILE_COUNT tiles, each tile has the whole texture
-#define FLOOR_TILE_COUNT    5
+// each FLOOR_TILE_SIZE x FLOOR_TILE_SIZE tile has the whole texture
+#define FLOOR_TILE_SIZE     4.0f
+// tiles start from this position, so the tiles are at same place as on the 20x20 floor
+#define FLOOR_TILE_START    -10.0f
 
 struct FloorVertice
 {
@@ -41,32 +42,25 @@ Floor::~Floor()
 
 int Floor::init()
 {
-    // rectangle -10/0/10, 10/0/10, 10/0/-10, -10/0/-10 divided into tiles,
-    // every other tile column/row has reversed texture, so tile edges match each other
+    // one rectangle, texture is repeated on every tile and every other tile column/row
+    // has reversed texture (mirrored repeat), so tile edges match each other
     std::vector<FloorVertice> listVertices;
-    const float tileSize = FLOOR_HALF_SIZE*2.0f/static_cast<float>(FLOOR_TILE_COUNT);
-    int x, z;
+    const float x0 = -FLOOR_HALF_SIZE;
+    const float x1 = FLOOR_HALF_SIZE;
+    const float z0 = -FLOOR_HALF_SIZE;
+    const float z1 = FLOOR_HALF_SIZE;
+    const float s0 = (x0 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
+    const float s1 = (x1 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
+    const float t0 = (z0 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
+    const float t1 = (z1 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
 
-    for (z=0;z<FLOOR_TILE_COUNT;z++) {
-        const float z0 = -FLOOR_HALF_SIZE + static_cast<float>(z)*tileSize;
-        const float z1 = z0 + tileSize;
-        const float t0 = (z % 2) ? 1.0f : 0.0f;
-        const float t1 = 1.0f - t0;
-        for (x=0;x<FLOOR_TILE_COUNT;x++) {
-            const float x0 = -FLOOR_HALF_SIZE + static_cast<float>(x)*tileSize;
-            const float x1 = x0 + tileSize;
-            const float s0 = (x % 2) ? 1.0f : 0.0f;
-            const float s1 = 1.0f - s0;
+    listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+    listVertices.push_back( { x1, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s1, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+    listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
 
-            listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-            listVertices.push_back( { x1, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s1, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-            listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
-
-            listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-            listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
-            listVertices.push_back( { x0, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s0, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
-        }
-    }
+    listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+    listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+    listVertices.push_back( { x0, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s0, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
 
     m_verticesCount = static_cast<int>(listVertices.size());
     glGenVertexArrays(1, &m_vertexArrayObject);
@@ -90,11 +84,19 @@ int Floor::init()
     if (!m_textureIndex) {
         return 1;
     }
-    // texture is loaded with nearest filtering, use smooth filtering with mipmaps for the floor
+    // texture is loaded with nearest filtering and clamping, use smooth filtering with mipmaps for the floor
     glBindTexture(GL_TEXTURE_2D, m_textureIndex);
     glGenerateMipmap(GL_TEXTURE_2D);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+    if (GLEW_EXT_texture_filter_anisotropic) {
+        // keeps the floor sharper when it is seen at low angle far away
+        GLfloat maxAnisotropy;
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &maxAnisotropy);
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAnisotropy);
+    }
     glBindTexture(GL_TEXTURE_2D, 0);
     return 0;
 }

@@ -19,7 +19,8 @@
 
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 #define CAMERA_NEAR_PLANE       0.1f
-#define CAMERA_FAR_PLANE        100.0f
+// far plane reaches the corners of the floor
+#define CAMERA_FAR_PLANE        10000.0f
 
 BaseScene::BaseScene() :
     m_directionLineVisible(true),
