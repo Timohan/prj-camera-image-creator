@@ -59,16 +59,18 @@ bool CameraObjectsConfig::read(const std::string &filename)
     std::vector<CameraObjectConfig> listCamera;
     for (int i=0;i<static_cast<int>(count);i++) {
         CameraObjectConfig camera;
-        if (!ini.getVector("cameraObjectPosition" + std::to_string(i), &camera.position)) {
-            std::cerr << filename << ": cameraObjectPosition" << i << " is missing or invalid" << std::endl;
+        // camera numbers in the file are 1-cameraCount, same as the keys selecting the camera views
+        const int number = i + 1;
+        const std::string index = std::to_string(number);
+        if (!ini.getVector("cameraObjectPosition" + index, &camera.position)) {
+            std::cerr << filename << ": cameraObjectPosition" << number << " is missing or invalid" << std::endl;
             return false;
         }
-        if (!ini.getVector("cameraObjectDirection" + std::to_string(i), &camera.direction)
+        if (!ini.getVector("cameraObjectDirection" + index, &camera.direction)
             || (camera.direction.x == 0.0f && camera.direction.y == 0.0f && camera.direction.z == 0.0f)) {
-            std::cerr << filename << ": cameraObjectDirection" << i << " is missing or invalid" << std::endl;
+            std::cerr << filename << ": cameraObjectDirection" << number << " is missing or invalid" << std::endl;
             return false;
         }
-        const std::string index = std::to_string(i);
         float sensorSize[2] = { camera.sensorWidth, camera.sensorHeight };
         float resolution[2] = { camera.resolutionWidth, camera.resolutionHeight };
         if (!readOptional(ini, "cameraObjectRoll" + index, &camera.roll, 1, false)

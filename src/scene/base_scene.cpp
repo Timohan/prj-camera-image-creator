@@ -160,7 +160,7 @@ void BaseScene::requestSaveImages()
 /*!
  * \brief BaseScene::saveCameraImages
  * saves image of every camera object to the output directory as
- * <objects filename>_<timestamp>_<camera index>.png
+ * <objects filename>_<timestamp>_<camera number>.png, camera number is 1-cameraCount as in cameraobjects.ini
  */
 void BaseScene::saveCameraImages()
 {
@@ -186,7 +186,7 @@ void BaseScene::saveCameraImages()
     };
     for (int i=0;i<m_cameraCount;i++) {
         const std::string filename = (std::filesystem::path(m_outputDirectory)
-                                      / (std::string(OBJECTS_NAME) + "_" + timestamp + "_" + std::to_string(i) + ".png")).string();
+                                      / (std::string(OBJECTS_NAME) + "_" + timestamp + "_" + std::to_string(i + 1) + ".png")).string();
         if (CameraImageSaver::save(m_listCameraObject[i], render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, filename)) {
             std::cout << "Saved " << filename << std::endl;
         }
