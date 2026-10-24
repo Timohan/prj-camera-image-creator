@@ -13,8 +13,8 @@
  * principal point, roll), lens distortion is simulated with OpenCV pinhole model
  * (radial k1-k6, tangential p1-p2) or OpenCV fisheye model (k1-k4), then
  * depth of field (aperture, focus distance) is simulated.
- * Distance from the camera to every pixel is saved to binary data file: uint32_t width,
- * uint32_t height and double distance in mm for every pixel, sky is as far as earth's orbit.
+ * Distance from the camera to every pixel and camera and lens information are saved
+ * to binary data file, see saveData() for the format.
  */
 class CameraImageSaver
 {
@@ -24,8 +24,8 @@ public:
     typedef std::function<void(const Matrix4x4 &projection, const Matrix4x4 &view,
                                const VECTOR3 *distanceFrom)> RenderFunction;
 
-    static bool save(const CameraObject &camera, const RenderFunction &render,
-                     float zNear, float zFar, const std::string &imageFilename, const std::string &dataFilename);
+    static bool save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar,
+                     int cameraNumber, const std::string &imageFilename, const std::string &dataFilename);
 
 private:
     static bool createPinholeImage(const CameraObject &camera, const RenderFunction &render,
@@ -35,7 +35,7 @@ private:
     static bool renderImage(const RenderFunction &render, const Matrix4x4 &projection, const Matrix4x4 &view,
                             const VECTOR3 &position, float zNear, float zFar, int width, int height,
                             cv::Mat *image, cv::Mat *depth, cv::Mat *distance);
-    static bool saveDistances(const cv::Mat &distance, const std::string &filename);
+    static bool saveData(const CameraObject &camera, int cameraNumber, const cv::Mat &distance, const std::string &filename);
     static cv::Vec3b sampleLinear(const cv::Mat &image, float column, float row);
     static void applyDepthOfField(const CameraObjectConfig &config, const cv::Mat &depth, cv::Mat *image);
     static cv::Rect getDistortedArea(const cv::Mat &cameraMatrix, const cv::Mat &distortion, int width, int height);

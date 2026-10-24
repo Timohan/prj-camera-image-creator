@@ -208,7 +208,7 @@ void BaseScene::saveCameraImages()
         const std::string filename = (std::filesystem::path(m_outputDirectory)
                                       / (std::string(OBJECTS_NAME) + "_" + timestamp + "_" + std::to_string(i + 1))).string();
         if (CameraImageSaver::save(m_listCameraObject[i], render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE,
-                                   filename + ".png", filename + ".dat")) {
+                                   i + 1, filename + ".png", filename + ".dat")) {
             std::cout << "Saved " << filename << ".png and .dat" << std::endl;
         }
     }

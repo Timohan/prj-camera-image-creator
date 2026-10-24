@@ -32,6 +32,9 @@
 // distance map values that are not distances
 #define DISTANCE_SKY                -1.0f
 #define DISTANCE_NO_VIEW            -2.0f
+// camera and lens information block after the distances in the data file
+#define DATA_CAMERA_INFO_MAGIC      "CAMI"
+#define DATA_CAMERA_INFO_VERSION    1
 
 /*!
  * \brief CameraImageSaver::save
@@ -39,11 +42,13 @@
  * \param render renders the scene
  * \param zNear near plane
  * \param zFar far plane
- * \param filename full path of the png file
+ * \param cameraNumber number of the camera (1-cameraCount), it is saved to the data file
+ * \param imageFilename full path of the png file
+ * \param dataFilename full path of the binary data file
  * \return true on success
  */
-bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &render,
-                            float zNear, float zFar, const std::string &imageFilename, const std::string &dataFilename)
+bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar,
+                            int cameraNumber, const std::string &imageFilename, const std::string &dataFilename)
 {
     cv::Mat image, distance;
     const bool success = camera.getConfig().fisheye ? createFisheyeImage(camera, render, zNear, zFar, &image, &distance)
@@ -55,27 +60,50 @@ bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &re
         std::cerr << "Cannot save " << imageFilename << std::endl;
         return false;
     }
-    return saveDistances(distance, dataFilename);
+    return saveData(camera, cameraNumber, distance, dataFilename);
 }
 
 /*!
- * \brief CameraImageSaver::saveDistances
- * saves binary data file: uint32_t width, uint32_t height and then double distance in mm
- * for every pixel row by row from the top left pixel (native byte order). Sky is as far
- * as earth's orbit and pixels that do not see anything (outside of the lens field of view) are 0
+ * \brief CameraImageSaver::saveData
+ * saves binary data file (native byte order, little-endian on x86):
+ * uint32_t width, uint32_t height,
+ * double distance in mm for every pixel row by row from the top left pixel, sky is as far
+ * as earth's orbit and pixels that do not see anything (outside of the lens field of view) are 0,
+ * then camera and lens information:
+ * char[4] "CAMI", uint32_t version (1), uint32_t camera number, uint32_t distortion model (0 pinhole, 1 fisheye),
+ * and doubles: position x/y/z (mm), direction x/y/z, up vector x/y/z (with roll), roll (degrees),
+ * focal length (mm), sensor width/height (mm), resolution width/height (pixels),
+ * focal length x/y (pixels), principal point x/y (pixels), radial distortion k1-k6,
+ * tangential distortion p1-p2, fisheye distortion k1-k4, field of view (degrees),
+ * aperture (f-number), focus distance (mm).
+ * World coordinates: x right, y up, z forward (left-handed).
+ * \param camera camera object
+ * \param cameraNumber number of the camera
  * \param distance distance of every pixel in opengl units, DISTANCE_SKY or DISTANCE_NO_VIEW
  * \param filename full path of the data file
  * \return true on success
  */
-bool CameraImageSaver::saveDistances(const cv::Mat &distance, const std::string &filename)
+bool CameraImageSaver::saveData(const CameraObject &camera, int cameraNumber, const cv::Mat &distance, const std::string &filename)
 {
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Cannot save " << filename << std::endl;
         return false;
     }
-    const uint32_t size[2] = { static_cast<uint32_t>(distance.cols), static_cast<uint32_t>(distance.rows) };
-    file.write(reinterpret_cast<const char *>(size), sizeof(size));
+    auto writeUint32 = [&file](uint32_t value) {
+        file.write(reinterpret_cast<const char *>(&value), sizeof(value));
+    };
+    auto writeDouble = [&file](double value) {
+        file.write(reinterpret_cast<const char *>(&value), sizeof(value));
+    };
+    auto writeVector = [&writeDouble](const VECTOR3 &vector, double multiplier) {
+        writeDouble(static_cast<double>(vector.x)*multiplier);
+        writeDouble(static_cast<double>(vector.y)*multiplier);
+        writeDouble(static_cast<double>(vector.z)*multiplier);
+    };
+
+    writeUint32(static_cast<uint32_t>(distance.cols));
+    writeUint32(static_cast<uint32_t>(distance.rows));
     std::vector<double> row(static_cast<size_t>(distance.cols));
     for (int y=0;y<distance.rows;y++) {
         for (int x=0;x<distance.cols;x++) {
@@ -90,6 +118,38 @@ bool CameraImageSaver::saveDistances(const cv::Mat &distance, const std::string 
         }
         file.write(reinterpret_cast<const char *>(row.data()), static_cast<std::streamsize>(row.size()*sizeof(double)));
     }
+
+    const CameraObjectConfig &config = camera.getConfig();
+    file.write(DATA_CAMERA_INFO_MAGIC, 4);
+    writeUint32(DATA_CAMERA_INFO_VERSION);
+    writeUint32(static_cast<uint32_t>(cameraNumber));
+    writeUint32(config.fisheye ? 1 : 0);
+    writeVector(camera.getPosition(), MM_TO_OPENGL_UNIT);
+    writeVector(camera.getDirection(), 1.0);
+    writeVector(camera.getUpVector(), 1.0);
+    writeDouble(config.roll);
+    writeDouble(config.focalLength);
+    writeDouble(config.sensorWidth);
+    writeDouble(config.sensorHeight);
+    writeDouble(config.resolutionWidth);
+    writeDouble(config.resolutionHeight);
+    writeDouble(static_cast<double>(config.focalLength)*config.resolutionWidth/config.sensorWidth);
+    writeDouble(static_cast<double>(config.focalLength)*config.resolutionHeight/config.sensorHeight);
+    writeDouble(config.principalPointX);
+    writeDouble(config.principalPointY);
+    for (float k : config.radialDistortion) {
+        writeDouble(k);
+    }
+    for (float p : config.tangentialDistortion) {
+        writeDouble(p);
+    }
+    for (float k : config.fisheyeDistortion) {
+        writeDouble(k);
+    }
+    writeDouble(config.fieldOfView);
+    writeDouble(config.aperture);
+    writeDouble(static_cast<double>(config.focusDistance)*MM_TO_OPENGL_UNIT);
+
     if (!file.good()) {
         std::cerr << "Cannot save " << filename << std::endl;
         return false;
