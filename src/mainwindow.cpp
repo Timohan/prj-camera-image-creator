@@ -17,11 +17,22 @@ MainWindow::MainWindow(int width, int height)
     m_cameraKeyListener.connectOnSaveImages([this]() {
         m_baseScene.requestSaveImages();
     });
+    m_cameraKeyListener.connectOnTurnStart([this](int direction) {
+        m_baseScene.startTurn(direction);
+    });
+    m_cameraKeyListener.connectOnTurnStop([this](int direction) {
+        m_baseScene.stopTurn(direction);
+    });
 }
 
 int MainWindow::initCustomShader()
 {
     return m_baseScene.initCustomShader();
+}
+
+void MainWindow::customBeforeRender()
+{
+    m_baseScene.updateTurn();
 }
 
 void MainWindow::customRender()

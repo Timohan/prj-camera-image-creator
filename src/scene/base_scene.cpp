@@ -35,7 +35,9 @@ BaseScene::BaseScene() :
     m_cameraCount(0),
     m_cameraObjectsVisible(true),
     m_cameraIndex(0),
-    m_saveImagesRequested(false)
+    m_saveImagesRequested(false),
+    m_moveSpeed(1000.0f),
+    m_turnDirection(0)
 {
     setupVisualPosition();
     createCameraObjects();
@@ -101,7 +103,8 @@ void BaseScene::customRender(float width, float height)
     }
     viewMatrix = m_camera.getViewMatrix();
 
-    renderScene(mvp, viewMatrix);
+    // camera object does not see its own cone
+    renderScene(mvp, viewMatrix, m_cameraIndex-1);
     glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
 }
 
@@ -110,8 +113,9 @@ void BaseScene::customRender(float width, float height)
  * renders the scene to the current framebuffer and viewport
  * \param projection projection matrix
  * \param view view matrix
+ * \param hiddenCameraObject index of the camera object that is not rendered, -1 renders all
  */
-void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view)
+void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject)
 {
     const int tranformPosition = glGetUniformLocation(m_shader.generalShader(), "transformPosition");
 
@@ -142,7 +146,9 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view)
         // camera objects are not bent by the earth curve
         glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 0.0f);
         for (int i=0;i<m_cameraCount;i++) {
-            m_listCameraObject[i].render();
+            if (i != hiddenCameraObject) {
+                m_listCameraObject[i].render();
+            }
         }
     }
     glDisable(GL_DEPTH_TEST);
@@ -181,10 +187,10 @@ void BaseScene::saveCameraImages()
     localtime_r(&now, &localTime);
     strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", &localTime);
 
-    auto render = [this](const Matrix4x4 &projection, const Matrix4x4 &view) {
-        renderScene(projection, view);
-    };
     for (int i=0;i<m_cameraCount;i++) {
+        auto render = [this, i](const Matrix4x4 &projection, const Matrix4x4 &view) {
+            renderScene(projection, view, i);
+        };
         const std::string filename = (std::filesystem::path(m_outputDirectory)
                                       / (std::string(OBJECTS_NAME) + "_" + timestamp + "_" + std::to_string(i + 1) + ".png")).string();
         if (CameraImageSaver::save(m_listCameraObject[i], render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, filename)) {
@@ -288,6 +294,73 @@ void BaseScene::moveToCamera(int index)
     }
     m_cameraIndex = index;
     m_camera.setup(position, direction, upVector);
+    if (m_turnDirection != 0) {
+        // keeps turning from the new camera
+        startTurnFromCurrent();
+    }
+}
+
+/*!
+ * \brief BaseScene::startTurn
+ * starts turning the current camera around the vertical axis, full circle takes moveSpeed*10 milliseconds
+ * \param direction -1 turns to the left, 1 turns to the right
+ */
+void BaseScene::startTurn(int direction)
+{
+    if (direction == m_turnDirection) {
+        return;
+    }
+    // keeps turn of the other direction, if it was still going on
+    updateTurn();
+    m_turnDirection = direction;
+    startTurnFromCurrent();
+}
+
+/*!
+ * \brief BaseScene::stopTurn
+ * stops turning, the camera stays in the direction it has turned so far
+ * \param direction -1 left or 1 right, only the same direction stops turning
+ */
+void BaseScene::stopTurn(int direction)
+{
+    if (direction != m_turnDirection) {
+        return;
+    }
+    updateTurn();
+    m_turnDirection = 0;
+}
+
+/*!
+ * \brief BaseScene::updateTurn
+ * sets the camera direction by the time from the start of turning, this is called before every render
+ */
+void BaseScene::updateTurn()
+{
+    if (m_turnDirection == 0) {
+        return;
+    }
+    const std::chrono::duration<float, std::milli> elapsed = std::chrono::steady_clock::now() - m_turnStartTime;
+    // full circle in moveSpeed*10 milliseconds, positive angle turns to the right
+    const float angle = static_cast<float>(m_turnDirection)*elapsed.count()/(m_moveSpeed*10.0f)*2.0f*PI_VALUE;
+    auto turn = [angle](const VECTOR3 &v) {
+        VECTOR3 turned;
+        turned.x = v.x*cosf(angle) + v.z*sinf(angle);
+        turned.y = v.y;
+        turned.z = -v.x*sinf(angle) + v.z*cosf(angle);
+        return turned;
+    };
+    m_camera.setup(m_camera.getPosition(), turn(m_turnStartDirection), turn(m_turnStartUpVector));
+}
+
+/*!
+ * \brief BaseScene::startTurnFromCurrent
+ * turning starts now from the current camera direction
+ */
+void BaseScene::startTurnFromCurrent()
+{
+    m_turnStartTime = std::chrono::steady_clock::now();
+    m_turnStartDirection = m_camera.getDirection();
+    m_turnStartUpVector = m_camera.getUpVector();
 }
 
 /*!
@@ -318,5 +391,6 @@ void BaseScene::setupVisualPosition()
     m_baseDirection = config.getBaseDirection();
     m_directionLine.setup(config.getDirectionLineWidth(), config.getDirectionLineHeight());
     m_outputDirectory = config.getOutputDirectory();
+    m_moveSpeed = config.getMoveSpeed();
     moveToCamera(0);
 }

@@ -10,6 +10,7 @@ GeneralConfig::GeneralConfig()
     m_baseDirection = { 0.0f, 0.0f, 1.0f };
     m_directionLineWidth = 0.1f;
     m_directionLineHeight = 0.001f;
+    m_moveSpeed = 1000.0f;
 }
 
 /*!
@@ -28,6 +29,14 @@ bool GeneralConfig::read(const std::string &filename)
     }
     if (!ini.getString("outputDirectory", &m_outputDirectory) || m_outputDirectory.empty()) {
         std::cerr << filename << ": outputDirectory is missing, camera images cannot be saved" << std::endl;
+    }
+    if (ini.hasKey("moveSpeed")) {
+        float moveSpeed;
+        if (ini.getFloat("moveSpeed", &moveSpeed) && moveSpeed > 0.0f) {
+            m_moveSpeed = moveSpeed;
+        } else {
+            std::cerr << filename << ": moveSpeed is not positive, using " << m_moveSpeed << std::endl;
+        }
     }
     if (!ini.getVector("baseObjectPosition", &position)) {
         std::cerr << filename << ": baseObjectPosition is missing or invalid" << std::endl;
@@ -78,4 +87,9 @@ float GeneralConfig::getDirectionLineHeight() const
 const std::string &GeneralConfig::getOutputDirectory() const
 {
     return m_outputDirectory;
+}
+
+float GeneralConfig::getMoveSpeed() const
+{
+    return m_moveSpeed;
 }

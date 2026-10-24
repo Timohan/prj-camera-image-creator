@@ -9,6 +9,7 @@
 #include "direction_line.h"
 #include "cameraobject.h"
 #include "objects_config.h"
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,9 @@ public:
     void toggleDirectionLine();
     void toggleCameraObjects();
     void requestSaveImages();
+    void startTurn(int direction);
+    void stopTurn(int direction);
+    void updateTurn();
 
 private:
     CameraShader m_shader;
@@ -46,12 +50,19 @@ private:
     int m_cameraIndex;
     std::string m_outputDirectory;
     bool m_saveImagesRequested;
+    float m_moveSpeed;
+    // turning with arrow keys: -1 left, 1 right, 0 not turning
+    int m_turnDirection;
+    std::chrono::steady_clock::time_point m_turnStartTime;
+    VECTOR3 m_turnStartDirection;
+    VECTOR3 m_turnStartUpVector;
 
     void createCameraObjects();
     void createObjects();
     void setupLight();
-    void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view);
+    void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject);
     void saveCameraImages();
+    void startTurnFromCurrent();
     void setupVisualPosition();
 };
 

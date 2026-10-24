@@ -25,8 +25,29 @@ void CameraKeyListener::connectOnSaveImages(std::function<void()> saveImages)
     m_saveImages = saveImages;
 }
 
+void CameraKeyListener::connectOnTurnStart(std::function<void(int direction)> turnStart)
+{
+    m_turnStart = turnStart;
+}
+
+void CameraKeyListener::connectOnTurnStop(std::function<void(int direction)> turnStop)
+{
+    m_turnStop = turnStop;
+}
+
 TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWindowInfo *windowInfo)
 {
+    if ((eventData->m_type == TgEventType::EventTypeKeyPress || eventData->m_type == TgEventType::EventTypeKeyRelease)
+        && (eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_Key_Left
+            || eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_Key_Right)) {
+        const int direction = eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_Key_Left ? -1 : 1;
+        if (eventData->m_type == TgEventType::EventTypeKeyPress && m_turnStart) {
+            m_turnStart(direction);
+        } else if (eventData->m_type == TgEventType::EventTypeKeyRelease && m_turnStop) {
+            m_turnStop(direction);
+        }
+        return TgEventResult::EventResultCompleted;
+    }
     if (eventData->m_type == TgEventType::EventTypeCharacterCallback
         && eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_NormalKey
         && eventData->m_event.m_keyEvent.m_key >= '0'

@@ -12,6 +12,7 @@ public:
 
 protected:
     virtual int initCustomShader() override;
+    virtual void customBeforeRender() override;
     virtual void customRender() override;
 
 private:
