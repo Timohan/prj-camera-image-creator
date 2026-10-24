@@ -9,6 +9,7 @@
 #include "direction_line.h"
 #include "cameraobject.h"
 #include "objects_config.h"
+#include "shadow_map.h"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -47,6 +48,7 @@ private:
     int m_cubeCount;
     std::vector<SpotLightConfig> m_listSpotLight;
     VECTOR3 m_ambientLight;
+    ShadowMap m_shadowMap;
     CameraObject *m_listCameraObject;
     int m_cameraCount;
     bool m_cameraObjectsVisible;
@@ -66,6 +68,7 @@ private:
     void createCameraObjects();
     void createObjects();
     void setupLight();
+    int createShadowMap();
     void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject,
                      const VECTOR3 *distanceFrom);
     void saveCameraImages();

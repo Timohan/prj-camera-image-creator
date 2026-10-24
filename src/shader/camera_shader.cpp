@@ -67,19 +67,29 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
 /*!
  * \brief CameraShader::m_fragShader
  *
- * fragment shader, ambient light and up to CAMERA_SHADER_MAX_SPOT_LIGHTS spot lights,
+ * fragment shader, ambient light and up to CAMERA_SHADER_MAX_SPOT_LIGHTS spot lights with shadows,
  * when sky is 1.0 spot lights are not used and the light is ambientLight*skyAmbientRate,
- * when distancePass is 1.0 red is the distance from distanceFrom to the pixel (float framebuffer)
+ * when distancePass is 1.0 red is the distance from distanceFrom to the pixel (float framebuffer).
+ * Shadow of the spot light: the pixel is moved toward its normal by SHADOW_NORMAL_OFFSET texels of the
+ * shadow map (no shadow acne), it is projected to the tile of the light in the shadow map and
+ * compared with 3x3 linear filtered samples (soft edge).
  */
 const char *CameraShader::m_fragShader = "" \
         "#define MAX_SPOT_LIGHTS " SHADER_VALUE(CAMERA_SHADER_MAX_SPOT_LIGHTS) "\n" \
+        "#define SHADOW_NORMAL_OFFSET 1.5\n" \
         "uniform sampler2D texture;" \
+        "uniform sampler2DShadow shadowMap;" \
+        "uniform vec2 shadowMapTexelSize;" \
         "uniform int lightCount;" \
         "uniform vec3 lightPosition[MAX_SPOT_LIGHTS];" \
         "uniform vec3 lightDirection[MAX_SPOT_LIGHTS];" \
         "uniform vec3 lightColor[MAX_SPOT_LIGHTS];" \
         "uniform float lightCosInner[MAX_SPOT_LIGHTS];" \
         "uniform float lightCosOuter[MAX_SPOT_LIGHTS];" \
+        "uniform mat4 lightProjection[MAX_SPOT_LIGHTS];" \
+        "uniform mat4 lightView[MAX_SPOT_LIGHTS];" \
+        "uniform vec4 lightShadowTile[MAX_SPOT_LIGHTS];" \
+        "uniform float lightShadowTexelRate[MAX_SPOT_LIGHTS];" \
         "uniform vec3 ambientLight;" \
         "uniform float sky;" \
         "uniform float skyAmbientRate;" \
@@ -89,6 +99,32 @@ const char *CameraShader::m_fragShader = "" \
         "varying vec3 worldNormal;" \
         "varying vec2 texCoord;" \
         "varying vec4 colorLight;" \
+        "float getShadow(int i, vec3 normal)" \
+        "{" \
+        "       float toLight   = length(lightPosition[i]-worldPosition);" \
+        "       vec3 position   = worldPosition + normal*toLight*lightShadowTexelRate[i]*SHADOW_NORMAL_OFFSET;" \
+        "       vec4 projected  = lightProjection[i]*(lightView[i]*vec4(position, 1.0));" \
+        "       if (projected.w <= 0.0) {" \
+        "           return 1.0;" \
+        "       }" \
+        "       vec3 ndc        = projected.xyz/projected.w;" \
+        "       if (abs(ndc.x) > 1.0 || abs(ndc.y) > 1.0) {" \
+        "           return 1.0;" \
+        "       }" \
+        "       vec4 tile       = lightShadowTile[i];" \
+        "       vec2 uv         = tile.xy + (ndc.xy*0.5 + 0.5)*tile.zw;" \
+        "       float depth     = min(ndc.z*0.5 + 0.5, 1.0);" \
+        "       vec2 minUv      = tile.xy + shadowMapTexelSize;" \
+        "       vec2 maxUv      = tile.xy + tile.zw - shadowMapTexelSize;" \
+        "       float lit       = 0.0;" \
+        "       for (int y=-1;y<=1;y++) {" \
+        "           for (int x=-1;x<=1;x++) {" \
+        "               vec2 sampleUv = clamp(uv + vec2(float(x), float(y))*shadowMapTexelSize, minUv, maxUv);" \
+        "               lit           += shadow2D(shadowMap, vec3(sampleUv, depth)).r;" \
+        "           }" \
+        "       }" \
+        "       return lit/9.0;" \
+        "}" \
         "void main()" \
         "{" \
         "       vec3 normal   = normalize(worldNormal);" \
@@ -99,7 +135,9 @@ const char *CameraShader::m_fragShader = "" \
         "               float diffuse  = max(dot(normal, toLight), 0.0);" \
         "               float cosAngle = dot(-toLight, normalize(lightDirection[i]));" \
         "               float spot     = smoothstep(lightCosOuter[i], lightCosInner[i], cosAngle);" \
-        "               light          += lightColor[i]*diffuse*spot;" \
+        "               if (diffuse*spot > 0.0) {" \
+        "                   light      += lightColor[i]*diffuse*spot*getShadow(i, normal);" \
+        "               }" \
         "           }" \
         "       }" \
         "       if (sky > 0.5) {" \

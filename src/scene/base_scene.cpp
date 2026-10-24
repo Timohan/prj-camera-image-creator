@@ -74,7 +74,35 @@ int BaseScene::initCustomShader()
             return 1;
         }
     }
-    return 0;
+    return createShadowMap();
+}
+
+/*!
+ * \brief BaseScene::createShadowMap
+ * renders the shadow maps of the spot lights, cubes cast the shadows, cubes and spot lights do not move
+ * \return 0 on success
+ */
+int BaseScene::createShadowMap()
+{
+    const GLuint shader = m_shader.generalShader();
+    auto render = [this, shader](const Matrix4x4 &projection, const Matrix4x4 &view) {
+        glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, projection.m);
+        glUniformMatrix4fv(glGetUniformLocation(shader, "view"), 1, GL_FALSE, view.m);
+        glUniform3f(glGetUniformLocation(shader, "transformPosition"), 0, 0, 0);
+        glUniform1f(glGetUniformLocation(shader, "earthRadius"), EARTH_RADIUS);
+        glUniform1f(glGetUniformLocation(shader, "earthCurve"), 1.0f);
+        // only the depth is used, no lights, so the shadow map is not read
+        glUniform1i(glGetUniformLocation(shader, "lightCount"), 0);
+        glUniform1f(glGetUniformLocation(shader, "sky"), 0.0f);
+        glUniform1f(glGetUniformLocation(shader, "distancePass"), 0.0f);
+        glEnable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        for (int i=0;i<m_cubeCount;i++) {
+            m_listCube[i].render();
+        }
+        glDisable(GL_DEPTH_TEST);
+    };
+    return m_shadowMap.create(shader, m_listSpotLight, render);
 }
 
 void BaseScene::customRender(float width, float height)
@@ -130,6 +158,7 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
     glUniform3f(tranformPosition, 0, 0, 0 );
     glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthRadius"), EARTH_RADIUS);
     setupLight();
+    m_shadowMap.setupShader(m_shader.generalShader());
     glUniform1f(glGetUniformLocation(m_shader.generalShader(), "distancePass"), distanceFrom ? 1.0f : 0.0f);
     if (distanceFrom) {
         glUniform3f(glGetUniformLocation(m_shader.generalShader(), "distanceFrom"), distanceFrom->x, distanceFrom->y, distanceFrom->z);
