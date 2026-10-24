@@ -21,6 +21,8 @@
 #define CAMERA_NEAR_PLANE       0.1f
 // floor, direction lines and cubes are bent by the curve of the earth
 #define EARTH_RADIUS            6371000.0f
+// sky brightness is the ambient light multiplied by this
+#define SKY_AMBIENT_RATE        2.0f
 // far plane reaches the corners of the floor
 #define CAMERA_FAR_PLANE        10000.0f
 
@@ -52,7 +54,8 @@ int BaseScene::initCustomShader()
         return 1;
     }
     glUseProgram(m_shader.generalShader() );
-    if (m_floor.init()
+    if (m_sky.init()
+        || m_floor.init()
         || m_directionLine.init()) {
         return 1;
     }
@@ -116,11 +119,18 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view)
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "view"), 1, GL_FALSE, view.m );
     glUniform3f(tranformPosition, 0, 0, 0 );
     glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthRadius"), EARTH_RADIUS);
-    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 1.0f);
     setupLight();
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
+    // sky is not bent by the earth curve, spot lights do not light it and
+    // its brightness follows the ambient light, which comes from the sky
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 0.0f);
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "sky"), 1.0f);
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "skyAmbientRate"), SKY_AMBIENT_RATE);
+    m_sky.render();
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "sky"), 0.0f);
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 1.0f);
     m_floor.render();
     if (m_directionLineVisible) {
         m_directionLine.render();

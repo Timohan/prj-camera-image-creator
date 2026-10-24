@@ -4,6 +4,7 @@
 #include "../shader/camera_shader.h"
 #include "../math/camera.h"
 #include "floor.h"
+#include "sky.h"
 #include "cube.h"
 #include "direction_line.h"
 #include "cameraobject.h"
@@ -31,6 +32,7 @@ private:
     Camera m_camera;
     VECTOR3 m_basePosition;
     VECTOR3 m_baseDirection;
+    Sky m_sky;
     Floor m_floor;
     DirectionLine m_directionLine;
     bool m_directionLineVisible;

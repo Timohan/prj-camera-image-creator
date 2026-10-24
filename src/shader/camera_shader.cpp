@@ -67,7 +67,8 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
 /*!
  * \brief CameraShader::m_fragShader
  *
- * fragment shader, ambient light and up to CAMERA_SHADER_MAX_SPOT_LIGHTS spot lights
+ * fragment shader, ambient light and up to CAMERA_SHADER_MAX_SPOT_LIGHTS spot lights,
+ * when sky is 1.0 spot lights are not used and the light is ambientLight*skyAmbientRate
  */
 const char *CameraShader::m_fragShader = "" \
         "#define MAX_SPOT_LIGHTS " SHADER_VALUE(CAMERA_SHADER_MAX_SPOT_LIGHTS) "\n" \
@@ -79,6 +80,8 @@ const char *CameraShader::m_fragShader = "" \
         "uniform float lightCosInner[MAX_SPOT_LIGHTS];" \
         "uniform float lightCosOuter[MAX_SPOT_LIGHTS];" \
         "uniform vec3 ambientLight;" \
+        "uniform float sky;" \
+        "uniform float skyAmbientRate;" \
         "varying vec3 worldPosition;" \
         "varying vec3 worldNormal;" \
         "varying vec2 texCoord;" \
@@ -95,6 +98,9 @@ const char *CameraShader::m_fragShader = "" \
         "               float spot     = smoothstep(lightCosOuter[i], lightCosInner[i], cosAngle);" \
         "               light          += lightColor[i]*diffuse*spot;" \
         "           }" \
+        "       }" \
+        "       if (sky > 0.5) {" \
+        "           light     = ambientLight*skyAmbientRate;" \
         "       }" \
         "       vec4 color    = texture2D(texture, texCoord)*colorLight;" \
         "       gl_FragColor  = vec4(color.rgb*light, color.a);" \
