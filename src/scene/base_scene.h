@@ -31,6 +31,7 @@ public:
     void stopTurn(int direction);
     void startPitch(int direction);
     void stopPitch(int direction);
+    void moveCamera(float steps);
     bool updateTurn();
 
 private:
@@ -53,6 +54,7 @@ private:
     std::string m_outputDirectory;
     bool m_saveImagesRequested;
     float m_moveSpeed;
+    float m_moveSpeedMouseWheel;
     // turning with arrow keys, yaw: -1 left, 1 right, pitch: -1 down, 1 up, 0 not turning
     int m_yawDirection;
     int m_pitchDirection;

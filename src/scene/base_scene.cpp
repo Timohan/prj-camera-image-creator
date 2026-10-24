@@ -18,6 +18,7 @@
 #define OBJECTS_NAME            "objects0"
 
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
+#define MM_TO_OPENGL_UNIT       1000.0f
 #define CAMERA_NEAR_PLANE       0.1f
 // floor, direction lines and cubes are bent by the curve of the earth
 #define EARTH_RADIUS            6371000.0f
@@ -37,6 +38,7 @@ BaseScene::BaseScene() :
     m_cameraIndex(0),
     m_saveImagesRequested(false),
     m_moveSpeed(1000.0f),
+    m_moveSpeedMouseWheel(1000.0f),
     m_yawDirection(0),
     m_pitchDirection(0)
 {
@@ -346,6 +348,22 @@ void BaseScene::stopPitch(int direction)
 }
 
 /*!
+ * \brief BaseScene::moveCamera
+ * moves the current camera forward or backward to its direction, direction does not change
+ * \param steps mouse wheel steps, every step moves moveSpeedMouseWheel mm, positive is forward
+ */
+void BaseScene::moveCamera(float steps)
+{
+    const VECTOR3 direction = Math3D::Vec3Normalize(m_camera.getDirection());
+    const float distance = steps*m_moveSpeedMouseWheel/MM_TO_OPENGL_UNIT;
+    VECTOR3 position = m_camera.getPosition();
+    position.x += direction.x*distance;
+    position.y += direction.y*distance;
+    position.z += direction.z*distance;
+    m_camera.setNewPosition(position);
+}
+
+/*!
  * \brief BaseScene::setTurnDirection
  * keeps the turn so far and starts turning again from the current camera with the new direction
  * \param turnDirection m_yawDirection or m_pitchDirection
@@ -446,5 +464,6 @@ void BaseScene::setupVisualPosition()
     m_directionLine.setup(config.getDirectionLineWidth(), config.getDirectionLineHeight());
     m_outputDirectory = config.getOutputDirectory();
     m_moveSpeed = config.getMoveSpeed();
+    m_moveSpeedMouseWheel = config.getMoveSpeedMouseWheel();
     moveToCamera(0);
 }

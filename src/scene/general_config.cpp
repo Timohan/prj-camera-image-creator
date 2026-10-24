@@ -4,6 +4,23 @@
 
 #define MM_TO_OPENGL_UNIT   1000.0f
 
+/*!
+ * \brief readPositive
+ * reads optional positive value, missing or invalid value keeps the current value
+ */
+static void readPositive(const IniFile &ini, const std::string &key, float *value)
+{
+    if (!ini.hasKey(key)) {
+        return;
+    }
+    float newValue;
+    if (ini.getFloat(key, &newValue) && newValue > 0.0f) {
+        *value = newValue;
+    } else {
+        std::cerr << ini.getFilename() << ": " << key << " is not positive, using " << *value << std::endl;
+    }
+}
+
 GeneralConfig::GeneralConfig()
 {
     m_basePosition = { 0.0f, 1.0f, 0.0f };
@@ -11,6 +28,7 @@ GeneralConfig::GeneralConfig()
     m_directionLineWidth = 0.1f;
     m_directionLineHeight = 0.001f;
     m_moveSpeed = 1000.0f;
+    m_moveSpeedMouseWheel = 1000.0f;
 }
 
 /*!
@@ -30,14 +48,8 @@ bool GeneralConfig::read(const std::string &filename)
     if (!ini.getString("outputDirectory", &m_outputDirectory) || m_outputDirectory.empty()) {
         std::cerr << filename << ": outputDirectory is missing, camera images cannot be saved" << std::endl;
     }
-    if (ini.hasKey("moveSpeed")) {
-        float moveSpeed;
-        if (ini.getFloat("moveSpeed", &moveSpeed) && moveSpeed > 0.0f) {
-            m_moveSpeed = moveSpeed;
-        } else {
-            std::cerr << filename << ": moveSpeed is not positive, using " << m_moveSpeed << std::endl;
-        }
-    }
+    readPositive(ini, "moveSpeed", &m_moveSpeed);
+    readPositive(ini, "moveSpeedMouseWheel", &m_moveSpeedMouseWheel);
     if (!ini.getVector("baseObjectPosition", &position)) {
         std::cerr << filename << ": baseObjectPosition is missing or invalid" << std::endl;
         return false;
@@ -92,4 +104,9 @@ const std::string &GeneralConfig::getOutputDirectory() const
 float GeneralConfig::getMoveSpeed() const
 {
     return m_moveSpeed;
+}
+
+float GeneralConfig::getMoveSpeedMouseWheel() const
+{
+    return m_moveSpeedMouseWheel;
 }

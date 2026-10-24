@@ -29,6 +29,9 @@ MainWindow::MainWindow(int width, int height)
     m_cameraKeyListener.connectOnPitchStop([this](int direction) {
         m_baseScene.stopPitch(direction);
     });
+    m_cameraKeyListener.connectOnMove([this](float steps) {
+        m_baseScene.moveCamera(steps);
+    });
 }
 
 int MainWindow::initCustomShader()

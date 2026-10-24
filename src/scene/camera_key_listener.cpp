@@ -45,8 +45,20 @@ void CameraKeyListener::connectOnPitchStop(std::function<void(int direction)> pi
     m_pitchStop = pitchStop;
 }
 
+void CameraKeyListener::connectOnMove(std::function<void(float steps)> move)
+{
+    m_move = move;
+}
+
 TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWindowInfo *windowInfo)
 {
+    if (eventData->m_type == TgEventType::EventTypeMouseScrollMove) {
+        // wheel forward is positive, many wheel steps can be summed into one event
+        if (m_move && eventData->m_event.m_mouseEvent.m_scroll_move_y != 0.0) {
+            m_move(static_cast<float>(eventData->m_event.m_mouseEvent.m_scroll_move_y));
+        }
+        return TgEventResult::EventResultCompleted;
+    }
     if ((eventData->m_type == TgEventType::EventTypeKeyPress || eventData->m_type == TgEventType::EventTypeKeyRelease)
         && (eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_Key_Left
             || eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_Key_Right)) {
