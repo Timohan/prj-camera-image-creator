@@ -107,7 +107,7 @@ void BaseScene::customRender(float width, float height)
     viewMatrix = m_camera.getViewMatrix();
 
     // camera object does not see its own cone
-    renderScene(mvp, viewMatrix, m_cameraIndex-1);
+    renderScene(mvp, viewMatrix, m_cameraIndex-1, nullptr);
     glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
 }
 
@@ -117,8 +117,11 @@ void BaseScene::customRender(float width, float height)
  * \param projection projection matrix
  * \param view view matrix
  * \param hiddenCameraObject index of the camera object that is not rendered, -1 renders all
+ * \param distanceFrom if not nullptr, renders distance from this position to every pixel instead
+ * of the colors (float framebuffer is needed), sky is not rendered
  */
-void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject)
+void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject,
+                            const VECTOR3 *distanceFrom)
 {
     const int tranformPosition = glGetUniformLocation(m_shader.generalShader(), "transformPosition");
 
@@ -127,16 +130,22 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
     glUniform3f(tranformPosition, 0, 0, 0 );
     glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthRadius"), EARTH_RADIUS);
     setupLight();
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "distancePass"), distanceFrom ? 1.0f : 0.0f);
+    if (distanceFrom) {
+        glUniform3f(glGetUniformLocation(m_shader.generalShader(), "distanceFrom"), distanceFrom->x, distanceFrom->y, distanceFrom->z);
+    }
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
 
-    // sky is not bent by the earth curve, spot lights do not light it and
-    // its brightness follows the ambient light, which comes from the sky
-    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 0.0f);
-    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "sky"), 1.0f);
-    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "skyAmbientRate"), SKY_AMBIENT_RATE);
-    m_sky.render();
-    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "sky"), 0.0f);
+    if (!distanceFrom) {
+        // sky is not bent by the earth curve, spot lights do not light it and
+        // its brightness follows the ambient light, which comes from the sky
+        glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 0.0f);
+        glUniform1f(glGetUniformLocation(m_shader.generalShader(), "sky"), 1.0f);
+        glUniform1f(glGetUniformLocation(m_shader.generalShader(), "skyAmbientRate"), SKY_AMBIENT_RATE);
+        m_sky.render();
+        glUniform1f(glGetUniformLocation(m_shader.generalShader(), "sky"), 0.0f);
+    }
     glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 1.0f);
     m_floor.render();
     if (m_directionLineVisible) {
@@ -154,6 +163,7 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
             }
         }
     }
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "distancePass"), 0.0f);
     glDisable(GL_DEPTH_TEST);
 }
 
@@ -169,7 +179,8 @@ void BaseScene::requestSaveImages()
 /*!
  * \brief BaseScene::saveCameraImages
  * saves image of every camera object to the output directory as
- * <objects filename>_<timestamp>_<camera number>.png, camera number is 1-cameraCount as in cameraobjects.ini
+ * <objects filename>_<timestamp>_<camera number>.png, camera number is 1-cameraCount as in cameraobjects.ini,
+ * and distance of every pixel to <objects filename>_<timestamp>_<camera number>.dat
  */
 void BaseScene::saveCameraImages()
 {
@@ -191,13 +202,14 @@ void BaseScene::saveCameraImages()
     strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", &localTime);
 
     for (int i=0;i<m_cameraCount;i++) {
-        auto render = [this, i](const Matrix4x4 &projection, const Matrix4x4 &view) {
-            renderScene(projection, view, i);
+        auto render = [this, i](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 *distanceFrom) {
+            renderScene(projection, view, i, distanceFrom);
         };
         const std::string filename = (std::filesystem::path(m_outputDirectory)
-                                      / (std::string(OBJECTS_NAME) + "_" + timestamp + "_" + std::to_string(i + 1) + ".png")).string();
-        if (CameraImageSaver::save(m_listCameraObject[i], render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, filename)) {
-            std::cout << "Saved " << filename << std::endl;
+                                      / (std::string(OBJECTS_NAME) + "_" + timestamp + "_" + std::to_string(i + 1))).string();
+        if (CameraImageSaver::save(m_listCameraObject[i], render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE,
+                                   filename + ".png", filename + ".dat")) {
+            std::cout << "Saved " << filename << ".png and .dat" << std::endl;
         }
     }
 }

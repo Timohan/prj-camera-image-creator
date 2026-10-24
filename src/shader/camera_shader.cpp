@@ -68,7 +68,8 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
  * \brief CameraShader::m_fragShader
  *
  * fragment shader, ambient light and up to CAMERA_SHADER_MAX_SPOT_LIGHTS spot lights,
- * when sky is 1.0 spot lights are not used and the light is ambientLight*skyAmbientRate
+ * when sky is 1.0 spot lights are not used and the light is ambientLight*skyAmbientRate,
+ * when distancePass is 1.0 red is the distance from distanceFrom to the pixel (float framebuffer)
  */
 const char *CameraShader::m_fragShader = "" \
         "#define MAX_SPOT_LIGHTS " SHADER_VALUE(CAMERA_SHADER_MAX_SPOT_LIGHTS) "\n" \
@@ -82,6 +83,8 @@ const char *CameraShader::m_fragShader = "" \
         "uniform vec3 ambientLight;" \
         "uniform float sky;" \
         "uniform float skyAmbientRate;" \
+        "uniform float distancePass;" \
+        "uniform vec3 distanceFrom;" \
         "varying vec3 worldPosition;" \
         "varying vec3 worldNormal;" \
         "varying vec2 texCoord;" \
@@ -104,6 +107,9 @@ const char *CameraShader::m_fragShader = "" \
         "       }" \
         "       vec4 color    = texture2D(texture, texCoord)*colorLight;" \
         "       gl_FragColor  = vec4(color.rgb*light, color.a);" \
+        "       if (distancePass > 0.5) {" \
+        "           gl_FragColor = vec4(length(worldPosition - distanceFrom), 0.0, 0.0, 1.0);" \
+        "       }" \
         "}";
 /*!
  * \brief CameraShader::CameraShader

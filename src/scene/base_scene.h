@@ -66,7 +66,8 @@ private:
     void createCameraObjects();
     void createObjects();
     void setupLight();
-    void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject);
+    void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject,
+                     const VECTOR3 *distanceFrom);
     void saveCameraImages();
     void startTurnFromCurrent();
     void setTurnDirection(int *turnDirection, int direction);

@@ -6,6 +6,8 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/utility.hpp>
 #include <algorithm>
+#include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <math.h>
 #include <vector>
@@ -25,6 +27,11 @@
 // cube face sees this many pixels more on every side than 90 degrees
 #define FISHEYE_FACE_MARGIN_PIXELS  2.0f
 #define FISHEYE_NEWTON_ITERATIONS   20
+// average distance from the earth to the sun in mm, distance of the sky
+#define EARTH_ORBIT_DISTANCE_MM     149597870700000.0
+// distance map values that are not distances
+#define DISTANCE_SKY                -1.0f
+#define DISTANCE_NO_VIEW            -2.0f
 
 /*!
  * \brief CameraImageSaver::save
@@ -36,15 +43,54 @@
  * \return true on success
  */
 bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &render,
-                            float zNear, float zFar, const std::string &filename)
+                            float zNear, float zFar, const std::string &imageFilename, const std::string &dataFilename)
 {
-    cv::Mat image;
-    const bool success = camera.getConfig().fisheye ? createFisheyeImage(camera, render, zNear, zFar, &image)
-                                                    : createPinholeImage(camera, render, zNear, zFar, &image);
+    cv::Mat image, distance;
+    const bool success = camera.getConfig().fisheye ? createFisheyeImage(camera, render, zNear, zFar, &image, &distance)
+                                                    : createPinholeImage(camera, render, zNear, zFar, &image, &distance);
     if (!success) {
         return false;
     }
-    if (!cv::imwrite(filename, image)) {
+    if (!cv::imwrite(imageFilename, image)) {
+        std::cerr << "Cannot save " << imageFilename << std::endl;
+        return false;
+    }
+    return saveDistances(distance, dataFilename);
+}
+
+/*!
+ * \brief CameraImageSaver::saveDistances
+ * saves binary data file: uint32_t width, uint32_t height and then double distance in mm
+ * for every pixel row by row from the top left pixel (native byte order). Sky is as far
+ * as earth's orbit and pixels that do not see anything (outside of the lens field of view) are 0
+ * \param distance distance of every pixel in opengl units, DISTANCE_SKY or DISTANCE_NO_VIEW
+ * \param filename full path of the data file
+ * \return true on success
+ */
+bool CameraImageSaver::saveDistances(const cv::Mat &distance, const std::string &filename)
+{
+    std::ofstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Cannot save " << filename << std::endl;
+        return false;
+    }
+    const uint32_t size[2] = { static_cast<uint32_t>(distance.cols), static_cast<uint32_t>(distance.rows) };
+    file.write(reinterpret_cast<const char *>(size), sizeof(size));
+    std::vector<double> row(static_cast<size_t>(distance.cols));
+    for (int y=0;y<distance.rows;y++) {
+        for (int x=0;x<distance.cols;x++) {
+            const float value = distance.at<float>(y, x);
+            double millimeters = 0.0;
+            if (value == DISTANCE_SKY) {
+                millimeters = EARTH_ORBIT_DISTANCE_MM;
+            } else if (value >= 0.0f) {
+                millimeters = static_cast<double>(value)*MM_TO_OPENGL_UNIT;
+            }
+            row[static_cast<size_t>(x)] = millimeters;
+        }
+        file.write(reinterpret_cast<const char *>(row.data()), static_cast<std::streamsize>(row.size()*sizeof(double)));
+    }
+    if (!file.good()) {
         std::cerr << "Cannot save " << filename << std::endl;
         return false;
     }
@@ -55,10 +101,11 @@ bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &re
  * \brief CameraImageSaver::createPinholeImage
  * creates the image of the OpenCV pinhole camera model with radial (k1-k6) and tangential (p1-p2) distortion
  * \param image returns the BGR image
+ * \param distance returns distance of every pixel
  * \return true on success
  */
 bool CameraImageSaver::createPinholeImage(const CameraObject &camera, const RenderFunction &render,
-                                          float zNear, float zFar, cv::Mat *image)
+                                          float zNear, float zFar, cv::Mat *image, cv::Mat *distance)
 {
     const CameraObjectConfig &config = camera.getConfig();
     const int width = static_cast<int>(lroundf(config.resolutionWidth));
@@ -87,7 +134,8 @@ bool CameraImageSaver::createPinholeImage(const CameraObject &camera, const Rend
                                                                  static_cast<float>(area.width),
                                                                  static_cast<float>(area.height),
                                                                  zNear, zFar);
-    if (!renderImage(render, projection, camera.getViewMatrix(), zNear, zFar, area.width, area.height, image, &depth)) {
+    if (!renderImage(render, projection, camera.getViewMatrix(), camera.getPosition(), zNear, zFar,
+                     area.width, area.height, image, &depth, distance)) {
         return false;
     }
     applyDepthOfField(config, depth, image);
@@ -110,9 +158,12 @@ bool CameraImageSaver::createPinholeImage(const CameraObject &camera, const Rend
                 mapY.at<float>(y, x) = point.y - static_cast<float>(area.y);
             }
         }
-        cv::Mat distorted;
+        cv::Mat distorted, distortedDistance;
         cv::remap(*image, distorted, mapX, mapY, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+        // distances of different objects must not be mixed
+        cv::remap(*distance, distortedDistance, mapX, mapY, cv::INTER_NEAREST, cv::BORDER_CONSTANT, cv::Scalar(DISTANCE_NO_VIEW));
         *image = distorted;
+        *distance = distortedDistance;
     }
     return true;
 }
@@ -126,10 +177,11 @@ bool CameraImageSaver::createPinholeImage(const CameraObject &camera, const Rend
  * around the camera and every pixel takes its color from the face its ray hits.
  * Rays wider than the field of view of the lens are black.
  * \param image returns the BGR image
+ * \param distance returns distance of every pixel
  * \return true on success
  */
 bool CameraImageSaver::createFisheyeImage(const CameraObject &camera, const RenderFunction &render,
-                                          float zNear, float zFar, cv::Mat *image)
+                                          float zNear, float zFar, cv::Mat *image, cv::Mat *distance)
 {
     const CameraObjectConfig &config = camera.getConfig();
     const int width = static_cast<int>(lroundf(config.resolutionWidth));
@@ -158,7 +210,7 @@ bool CameraImageSaver::createFisheyeImage(const CameraObject &camera, const Rend
     auto negative = [](const VECTOR3 &v) { VECTOR3 n = { -v.x, -v.y, -v.z }; return n; };
     struct Face {
         VECTOR3 direction, up, right;
-        cv::Mat image, depth;
+        cv::Mat image, depth, distance;
     };
     Face faces[6];
     const VECTOR3 faceDirections[6] = { forward, right, negative(right), negative(forward), up, negative(up) };
@@ -177,13 +229,16 @@ bool CameraImageSaver::createFisheyeImage(const CameraObject &camera, const Rend
         at.z = position.z + faceDirections[i].z;
         Matrix4x4 view;
         Math3D::MatrixLookAtLH(&view, position, at, faceUps[i]);
-        if (!renderImage(render, projection, view, zNear, zFar, faceSize, faceSize, &faces[i].image, &faces[i].depth)) {
+        if (!renderImage(render, projection, view, position, zNear, zFar, faceSize, faceSize,
+                         &faces[i].image, &faces[i].depth, &faces[i].distance)) {
             return false;
         }
     }
 
     cv::Mat result(height, width, CV_8UC3, cv::Scalar(0, 0, 0));
-    cv::Mat distance(height, width, CV_32FC1, cv::Scalar(zFar));
+    // distance along the ray for the depth of field
+    cv::Mat rayDistance(height, width, CV_32FC1, cv::Scalar(zFar));
+    cv::Mat resultDistance(height, width, CV_32FC1, cv::Scalar(DISTANCE_NO_VIEW));
     cv::parallel_for_(cv::Range(0, height), [&](const cv::Range &rows) {
         for (int y=rows.start;y<rows.end;y++) {
             for (int x=0;x<width;x++) {
@@ -238,12 +293,14 @@ bool CameraImageSaver::createFisheyeImage(const CameraObject &camera, const Rend
                 // depth of the face is along the face direction, distance is along the ray
                 const int depthColumn = std::min(faceSize - 1, std::max(0, static_cast<int>(lroundf(column))));
                 const int depthRow = std::min(faceSize - 1, std::max(0, static_cast<int>(lroundf(row))));
-                distance.at<float>(y, x) = std::min(zFar, face.depth.at<float>(depthRow, depthColumn)/faceDot);
+                rayDistance.at<float>(y, x) = std::min(zFar, face.depth.at<float>(depthRow, depthColumn)/faceDot);
+                resultDistance.at<float>(y, x) = face.distance.at<float>(depthRow, depthColumn);
             }
         }
     });
-    applyDepthOfField(config, distance, &result);
+    applyDepthOfField(config, rayDistance, &result);
     *image = result;
+    *distance = resultDistance;
     return true;
 }
 
@@ -280,14 +337,17 @@ cv::Vec3b CameraImageSaver::sampleLinear(const cv::Mat &image, float column, flo
  * \param width, height size of the image in pixels
  * \param image returns BGR image
  * \param depth returns distance from the camera plane in opengl units for every pixel
+ * \param distance returns distance from the position in opengl units for every pixel, DISTANCE_SKY for the sky,
+ * it is rendered separately to float framebuffer, so it is exact also far away
  * \return true on success
  */
 bool CameraImageSaver::renderImage(const RenderFunction &render, const Matrix4x4 &projection, const Matrix4x4 &view,
-                                   float zNear, float zFar, int width, int height, cv::Mat *image, cv::Mat *depth)
+                                   const VECTOR3 &position, float zNear, float zFar, int width, int height,
+                                   cv::Mat *image, cv::Mat *depth, cv::Mat *distance)
 {
     GLint oldFramebuffer, oldViewport[4], oldPackAlignment;
     GLfloat oldClearColor[4];
-    GLuint framebuffer, renderbuffers[2];
+    GLuint framebuffer, renderbuffers[3];
     bool success = true;
 
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFramebuffer);
@@ -296,11 +356,13 @@ bool CameraImageSaver::renderImage(const RenderFunction &render, const Matrix4x4
     glGetFloatv(GL_COLOR_CLEAR_VALUE, oldClearColor);
 
     glGenFramebuffers(1, &framebuffer);
-    glGenRenderbuffers(2, renderbuffers);
+    glGenRenderbuffers(3, renderbuffers);
     glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[0]);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
     glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[1]);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[2]);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_R32F, width, height);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffers[0]);
@@ -313,7 +375,7 @@ bool CameraImageSaver::renderImage(const RenderFunction &render, const Matrix4x4
         glViewport(0, 0, width, height);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        render(projection, view);
+        render(projection, view, nullptr);
 
         cv::Mat flippedImage(height, width, CV_8UC3);
         cv::Mat flippedDepth(height, width, CV_32FC1);
@@ -331,11 +393,33 @@ bool CameraImageSaver::renderImage(const RenderFunction &render, const Matrix4x4
             const float ndc = value*2.0f - 1.0f;
             value = ndc >= 1.0f ? zFar : b/(ndc - a);
         });
+
+        // distance pass to float color buffer, pixels without objects are sky
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffers[2]);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "Cannot create distance framebuffer " << width << "x" << height << std::endl;
+            success = false;
+        } else {
+            // distances are larger than 1.0, so colors must not be clamped
+            GLint oldClampFragmentColor, oldClampReadColor;
+            glGetIntegerv(GL_CLAMP_FRAGMENT_COLOR, &oldClampFragmentColor);
+            glGetIntegerv(GL_CLAMP_READ_COLOR, &oldClampReadColor);
+            glClampColor(GL_CLAMP_FRAGMENT_COLOR, GL_FALSE);
+            glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
+            glClearColor(DISTANCE_SKY, 0.0f, 0.0f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            render(projection, view, &position);
+            cv::Mat flippedDistance(height, width, CV_32FC1);
+            glReadPixels(0, 0, width, height, GL_RED, GL_FLOAT, flippedDistance.data);
+            cv::flip(flippedDistance, *distance, 0);
+            glClampColor(GL_CLAMP_FRAGMENT_COLOR, static_cast<GLenum>(oldClampFragmentColor));
+            glClampColor(GL_CLAMP_READ_COLOR, static_cast<GLenum>(oldClampReadColor));
+        }
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(oldFramebuffer));
     glDeleteFramebuffers(1, &framebuffer);
-    glDeleteRenderbuffers(2, renderbuffers);
+    glDeleteRenderbuffers(3, renderbuffers);
     glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
     glPixelStorei(GL_PACK_ALIGNMENT, oldPackAlignment);
     glClearColor(oldClearColor[0], oldClearColor[1], oldClearColor[2], oldClearColor[3]);
