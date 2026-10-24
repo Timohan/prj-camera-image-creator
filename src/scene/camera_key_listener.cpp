@@ -35,6 +35,16 @@ void CameraKeyListener::connectOnTurnStop(std::function<void(int direction)> tur
     m_turnStop = turnStop;
 }
 
+void CameraKeyListener::connectOnPitchStart(std::function<void(int direction)> pitchStart)
+{
+    m_pitchStart = pitchStart;
+}
+
+void CameraKeyListener::connectOnPitchStop(std::function<void(int direction)> pitchStop)
+{
+    m_pitchStop = pitchStop;
+}
+
 TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWindowInfo *windowInfo)
 {
     if ((eventData->m_type == TgEventType::EventTypeKeyPress || eventData->m_type == TgEventType::EventTypeKeyRelease)
@@ -45,6 +55,17 @@ TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWin
             m_turnStart(direction);
         } else if (eventData->m_type == TgEventType::EventTypeKeyRelease && m_turnStop) {
             m_turnStop(direction);
+        }
+        return TgEventResult::EventResultCompleted;
+    }
+    if ((eventData->m_type == TgEventType::EventTypeKeyPress || eventData->m_type == TgEventType::EventTypeKeyRelease)
+        && (eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_Key_Up
+            || eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_Key_Down)) {
+        const int direction = eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_Key_Down ? -1 : 1;
+        if (eventData->m_type == TgEventType::EventTypeKeyPress && m_pitchStart) {
+            m_pitchStart(direction);
+        } else if (eventData->m_type == TgEventType::EventTypeKeyRelease && m_pitchStop) {
+            m_pitchStop(direction);
         }
         return TgEventResult::EventResultCompleted;
     }

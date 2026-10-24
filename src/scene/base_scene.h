@@ -29,6 +29,8 @@ public:
     void requestSaveImages();
     void startTurn(int direction);
     void stopTurn(int direction);
+    void startPitch(int direction);
+    void stopPitch(int direction);
     bool updateTurn();
 
 private:
@@ -51,8 +53,9 @@ private:
     std::string m_outputDirectory;
     bool m_saveImagesRequested;
     float m_moveSpeed;
-    // turning with arrow keys: -1 left, 1 right, 0 not turning
-    int m_turnDirection;
+    // turning with arrow keys, yaw: -1 left, 1 right, pitch: -1 down, 1 up, 0 not turning
+    int m_yawDirection;
+    int m_pitchDirection;
     std::chrono::steady_clock::time_point m_turnStartTime;
     VECTOR3 m_turnStartDirection;
     VECTOR3 m_turnStartUpVector;
@@ -63,6 +66,7 @@ private:
     void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject);
     void saveCameraImages();
     void startTurnFromCurrent();
+    void setTurnDirection(int *turnDirection, int direction);
     void setupVisualPosition();
 };
 

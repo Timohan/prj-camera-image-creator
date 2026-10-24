@@ -37,7 +37,8 @@ BaseScene::BaseScene() :
     m_cameraIndex(0),
     m_saveImagesRequested(false),
     m_moveSpeed(1000.0f),
-    m_turnDirection(0)
+    m_yawDirection(0),
+    m_pitchDirection(0)
 {
     setupVisualPosition();
     createCameraObjects();
@@ -294,7 +295,7 @@ void BaseScene::moveToCamera(int index)
     }
     m_cameraIndex = index;
     m_camera.setup(position, direction, upVector);
-    if (m_turnDirection != 0) {
+    if (m_yawDirection != 0 || m_pitchDirection != 0) {
         // keeps turning from the new camera
         startTurnFromCurrent();
     }
@@ -302,67 +303,118 @@ void BaseScene::moveToCamera(int index)
 
 /*!
  * \brief BaseScene::startTurn
- * starts turning the current camera around the vertical axis, full circle takes moveSpeed*10 milliseconds
+ * starts turning (yaw) the current camera around the vertical axis, full circle takes moveSpeed*10 milliseconds
  * \param direction -1 turns to the left, 1 turns to the right
  */
 void BaseScene::startTurn(int direction)
 {
-    if (direction == m_turnDirection) {
-        return;
-    }
-    // keeps turn of the other direction, if it was still going on
-    updateTurn();
-    m_turnDirection = direction;
-    startTurnFromCurrent();
+    setTurnDirection(&m_yawDirection, direction);
 }
 
 /*!
  * \brief BaseScene::stopTurn
- * stops turning, the camera stays in the direction it has turned so far
+ * stops turning (yaw), the camera stays in the direction it has turned so far
  * \param direction -1 left or 1 right, only the same direction stops turning
  */
 void BaseScene::stopTurn(int direction)
 {
-    if (direction != m_turnDirection) {
+    if (direction == m_yawDirection) {
+        setTurnDirection(&m_yawDirection, 0);
+    }
+}
+
+/*!
+ * \brief BaseScene::startPitch
+ * starts turning (pitch) the current camera up or down, full circle takes moveSpeed*10 milliseconds
+ * \param direction -1 turns down, 1 turns up
+ */
+void BaseScene::startPitch(int direction)
+{
+    setTurnDirection(&m_pitchDirection, direction);
+}
+
+/*!
+ * \brief BaseScene::stopPitch
+ * stops turning (pitch), the camera stays in the direction it has turned so far
+ * \param direction -1 down or 1 up, only the same direction stops turning
+ */
+void BaseScene::stopPitch(int direction)
+{
+    if (direction == m_pitchDirection) {
+        setTurnDirection(&m_pitchDirection, 0);
+    }
+}
+
+/*!
+ * \brief BaseScene::setTurnDirection
+ * keeps the turn so far and starts turning again from the current camera with the new direction
+ * \param turnDirection m_yawDirection or m_pitchDirection
+ * \param direction new direction, 0 stops turning
+ */
+void BaseScene::setTurnDirection(int *turnDirection, int direction)
+{
+    if (*turnDirection == direction) {
         return;
     }
     updateTurn();
-    m_turnDirection = 0;
+    *turnDirection = direction;
+    startTurnFromCurrent();
 }
 
 /*!
  * \brief BaseScene::updateTurn
- * sets the camera direction by the time from the start of turning, this is called before every render
+ * sets the camera direction by the time from the start of turning, this is called before every render.
+ * Pitch turns the camera around its own right axis, then yaw turns it around the vertical axis.
  * \return true if the camera is turning
  */
 bool BaseScene::updateTurn()
 {
-    if (m_turnDirection == 0) {
+    if (m_yawDirection == 0 && m_pitchDirection == 0) {
         return false;
     }
     const std::chrono::duration<float, std::milli> elapsed = std::chrono::steady_clock::now() - m_turnStartTime;
-    // full circle in moveSpeed*10 milliseconds, positive angle turns to the right
-    const float angle = static_cast<float>(m_turnDirection)*elapsed.count()/(m_moveSpeed*10.0f)*2.0f*PI_VALUE;
-    auto turn = [angle](const VECTOR3 &v) {
+    // full circle in moveSpeed*10 milliseconds
+    const float angle = elapsed.count()/(m_moveSpeed*10.0f)*2.0f*PI_VALUE;
+    // positive yaw turns to the right, positive pitch turns up
+    const float yaw = static_cast<float>(m_yawDirection)*angle;
+    const float pitch = static_cast<float>(m_pitchDirection)*angle;
+
+    // pitch in the plane of the direction and the up vector
+    VECTOR3 direction, upVector;
+    direction.x = m_turnStartDirection.x*cosf(pitch) + m_turnStartUpVector.x*sinf(pitch);
+    direction.y = m_turnStartDirection.y*cosf(pitch) + m_turnStartUpVector.y*sinf(pitch);
+    direction.z = m_turnStartDirection.z*cosf(pitch) + m_turnStartUpVector.z*sinf(pitch);
+    upVector.x = m_turnStartUpVector.x*cosf(pitch) - m_turnStartDirection.x*sinf(pitch);
+    upVector.y = m_turnStartUpVector.y*cosf(pitch) - m_turnStartDirection.y*sinf(pitch);
+    upVector.z = m_turnStartUpVector.z*cosf(pitch) - m_turnStartDirection.z*sinf(pitch);
+
+    auto turnYaw = [yaw](const VECTOR3 &v) {
         VECTOR3 turned;
-        turned.x = v.x*cosf(angle) + v.z*sinf(angle);
+        turned.x = v.x*cosf(yaw) + v.z*sinf(yaw);
         turned.y = v.y;
-        turned.z = -v.x*sinf(angle) + v.z*cosf(angle);
+        turned.z = -v.x*sinf(yaw) + v.z*cosf(yaw);
         return turned;
     };
-    m_camera.setup(m_camera.getPosition(), turn(m_turnStartDirection), turn(m_turnStartUpVector));
+    m_camera.setup(m_camera.getPosition(), turnYaw(direction), turnYaw(upVector));
     return true;
 }
 
 /*!
  * \brief BaseScene::startTurnFromCurrent
- * turning starts now from the current camera direction
+ * turning starts now from the current camera direction, up vector is made
+ * perpendicular to the direction, so pitch keeps them perpendicular
  */
 void BaseScene::startTurnFromCurrent()
 {
     m_turnStartTime = std::chrono::steady_clock::now();
-    m_turnStartDirection = m_camera.getDirection();
-    m_turnStartUpVector = m_camera.getUpVector();
+    m_turnStartDirection = Math3D::Vec3Normalize(m_camera.getDirection());
+    const VECTOR3 upVector = m_camera.getUpVector();
+    const float dot = Math3D::Vec3Dot(upVector, m_turnStartDirection);
+    VECTOR3 perpendicular;
+    perpendicular.x = upVector.x - m_turnStartDirection.x*dot;
+    perpendicular.y = upVector.y - m_turnStartDirection.y*dot;
+    perpendicular.z = upVector.z - m_turnStartDirection.z*dot;
+    m_turnStartUpVector = Math3D::Vec3Normalize(perpendicular);
 }
 
 /*!

@@ -23,6 +23,12 @@ MainWindow::MainWindow(int width, int height)
     m_cameraKeyListener.connectOnTurnStop([this](int direction) {
         m_baseScene.stopTurn(direction);
     });
+    m_cameraKeyListener.connectOnPitchStart([this](int direction) {
+        m_baseScene.startPitch(direction);
+    });
+    m_cameraKeyListener.connectOnPitchStop([this](int direction) {
+        m_baseScene.stopPitch(direction);
+    });
 }
 
 int MainWindow::initCustomShader()
