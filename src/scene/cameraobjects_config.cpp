@@ -88,6 +88,14 @@ bool CameraObjectsConfig::read(const std::string &filename)
         }
         camera.principalPointX = principalPoint[0];
         camera.principalPointY = principalPoint[1];
+        float focusDistance = camera.focusDistance*MM_TO_OPENGL_UNIT;
+        if (!readOptional(ini, "cameraObjectRadialDistortionParameters" + index, camera.radialDistortion, 6, false)
+            || !readOptional(ini, "cameraObjectTangentialDistortionParameters" + index, camera.tangentialDistortion, 2, false)
+            || !readOptional(ini, "cameraObjectAperture" + index, &camera.aperture, 1, true)
+            || !readOptional(ini, "cameraObjectFocusDistance" + index, &focusDistance, 1, true)) {
+            return false;
+        }
+        camera.focusDistance = focusDistance/MM_TO_OPENGL_UNIT;
         camera.position.x /= MM_TO_OPENGL_UNIT;
         camera.position.y /= MM_TO_OPENGL_UNIT;
         camera.position.z /= MM_TO_OPENGL_UNIT;

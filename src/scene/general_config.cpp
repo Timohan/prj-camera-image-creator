@@ -26,6 +26,9 @@ bool GeneralConfig::read(const std::string &filename)
     if (!ini.read(filename)) {
         return false;
     }
+    if (!ini.getString("outputDirectory", &m_outputDirectory) || m_outputDirectory.empty()) {
+        std::cerr << filename << ": outputDirectory is missing, camera images cannot be saved" << std::endl;
+    }
     if (!ini.getVector("baseObjectPosition", &position)) {
         std::cerr << filename << ": baseObjectPosition is missing or invalid" << std::endl;
         return false;
@@ -70,4 +73,9 @@ float GeneralConfig::getDirectionLineWidth() const
 float GeneralConfig::getDirectionLineHeight() const
 {
     return m_directionLineHeight;
+}
+
+const std::string &GeneralConfig::getOutputDirectory() const
+{
+    return m_outputDirectory;
 }

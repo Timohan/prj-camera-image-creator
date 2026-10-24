@@ -89,11 +89,24 @@ float CameraObject::getAspectRatio() const
  */
 Matrix4x4 CameraObject::getProjectionMatrix(float zNear, float zFar) const
 {
+    return getImageProjectionMatrix(0.0f, 0.0f, m_config.resolutionWidth, m_config.resolutionHeight, zNear, zFar);
+}
+
+/*!
+ * \brief CameraObject::getImageProjectionMatrix
+ * projection of the camera that shows only the given area of the image, the area
+ * can be also larger than the image (same focal length in pixels, wider view)
+ * \param left, top top left corner of the area in image pixels
+ * \param width, height size of the area in pixels
+ * \param zNear near plane
+ * \param zFar far plane
+ * \return projection matrix
+ */
+Matrix4x4 CameraObject::getImageProjectionMatrix(float left, float top, float width, float height, float zNear, float zFar) const
+{
     Matrix4x4 projection;
-    const float width = m_config.resolutionWidth;
-    const float height = m_config.resolutionHeight;
-    const float fx = m_config.focalLength*width/m_config.sensorWidth;
-    const float fy = m_config.focalLength*height/m_config.sensorHeight;
+    const float fx = m_config.focalLength*m_config.resolutionWidth/m_config.sensorWidth;
+    const float fy = m_config.focalLength*m_config.resolutionHeight/m_config.sensorHeight;
 
     for (int i=0;i<16;i++) {
         projection.m[i] = 0.0f;
@@ -101,12 +114,33 @@ Matrix4x4 CameraObject::getProjectionMatrix(float zNear, float zFar) const
     Math3D::setMatrixValue(&projection, 0, 0, 2.0f*fx/width);
     Math3D::setMatrixValue(&projection, 1, 1, 2.0f*fy/height);
     // principal point is measured from the top left corner of the image, y axis down
-    Math3D::setMatrixValue(&projection, 2, 0, 2.0f*m_config.principalPointX/width - 1.0f);
-    Math3D::setMatrixValue(&projection, 2, 1, 1.0f - 2.0f*m_config.principalPointY/height);
+    Math3D::setMatrixValue(&projection, 2, 0, 2.0f*(m_config.principalPointX - left)/width - 1.0f);
+    Math3D::setMatrixValue(&projection, 2, 1, 1.0f - 2.0f*(m_config.principalPointY - top)/height);
     Math3D::setMatrixValue(&projection, 2, 2, zFar/(zFar-zNear));
     Math3D::setMatrixValue(&projection, 2, 3, 1.0f);
     Math3D::setMatrixValue(&projection, 3, 2, -zNear*zFar/(zFar-zNear));
     return projection;
+}
+
+/*!
+ * \brief CameraObject::getViewMatrix
+ * \return view matrix from the position and direction of the camera with the roll
+ */
+Matrix4x4 CameraObject::getViewMatrix() const
+{
+    Matrix4x4 view;
+    const VECTOR3 direction = getDirection();
+    VECTOR3 at;
+    at.x = m_config.position.x + direction.x;
+    at.y = m_config.position.y + direction.y;
+    at.z = m_config.position.z + direction.z;
+    Math3D::MatrixLookAtLH(&view, m_config.position, at, getUpVector());
+    return view;
+}
+
+const CameraObjectConfig &CameraObject::getConfig() const
+{
+    return m_config;
 }
 
 /*!

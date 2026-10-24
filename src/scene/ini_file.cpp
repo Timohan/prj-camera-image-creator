@@ -67,6 +67,16 @@ bool IniFile::getFloat(const std::string &key, float *value) const
     return it != m_values.end() && parseFloat(it->second, value);
 }
 
+bool IniFile::getString(const std::string &key, std::string *value) const
+{
+    auto it = m_values.find(key);
+    if (it == m_values.end()) {
+        return false;
+    }
+    *value = it->second;
+    return true;
+}
+
 bool IniFile::getVector(const std::string &key, VECTOR3 *vector) const
 {
     float values[3];

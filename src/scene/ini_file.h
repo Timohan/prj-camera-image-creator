@@ -19,6 +19,7 @@ public:
     const std::string &getFilename() const;
     bool hasKey(const std::string &key) const;
     bool getFloat(const std::string &key, float *value) const;
+    bool getString(const std::string &key, std::string *value) const;
     // vector is written as x/y/z
     bool getVector(const std::string &key, VECTOR3 *vector) const;
     // list is written as a/b/c..., it must have exactly count values

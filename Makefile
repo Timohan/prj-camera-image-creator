@@ -8,7 +8,7 @@
 #*/
 TARGET:=prj-camera-image-creator
 CXX:=$(if $(CXX),$(CXX),g++)
-PKGFLAGS=`pkg-config --cflags --libs prj-tg-ui-lib`
+PKGFLAGS=`pkg-config --cflags --libs prj-tg-ui-lib opencv4`
 CXXFLAGS+=-g -Wall -pedantic -c -pipe -std=gnu++17 -W -D_REENTRANT -fPIC
 CXXFLAGS+=-I./src
 CXXFLAGS+=$(PKGFLAGS)

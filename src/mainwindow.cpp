@@ -14,6 +14,9 @@ MainWindow::MainWindow(int width, int height)
     m_cameraKeyListener.connectOnToggleCameraObjects([this]() {
         m_baseScene.toggleCameraObjects();
     });
+    m_cameraKeyListener.connectOnSaveImages([this]() {
+        m_baseScene.requestSaveImages();
+    });
 }
 
 int MainWindow::initCustomShader()

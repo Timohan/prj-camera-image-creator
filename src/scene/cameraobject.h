@@ -23,6 +23,9 @@ public:
     VECTOR3 getUpVector() const;
     float getAspectRatio() const;
     Matrix4x4 getProjectionMatrix(float zNear, float zFar) const;
+    Matrix4x4 getImageProjectionMatrix(float left, float top, float width, float height, float zNear, float zFar) const;
+    Matrix4x4 getViewMatrix() const;
+    const CameraObjectConfig &getConfig() const;
 
     int init();
     void render();

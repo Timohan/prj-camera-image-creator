@@ -2,7 +2,10 @@
 #include "../math/math3d.h"
 #include "cameraobjects_config.h"
 #include "general_config.h"
+#include "camera_image_saver.h"
 #include <iostream>
+#include <filesystem>
+#include <time.h>
 
 // vertical field of view, wide enough to see the floor below the camera
 #ifndef CONFIGS_PATH
@@ -11,6 +14,8 @@
 #ifndef OBJECTS_PATH
 #define OBJECTS_PATH            "objects/"
 #endif
+// objects file is OBJECTS_PATH OBJECTS_NAME ".dat", saved images start with OBJECTS_NAME
+#define OBJECTS_NAME            "objects0"
 
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 #define CAMERA_NEAR_PLANE       0.1f
@@ -24,7 +29,8 @@ BaseScene::BaseScene() :
     m_listCameraObject(nullptr),
     m_cameraCount(0),
     m_cameraObjectsVisible(true),
-    m_cameraIndex(0)
+    m_cameraIndex(0),
+    m_saveImagesRequested(false)
 {
     setupVisualPosition();
     createCameraObjects();
@@ -65,8 +71,11 @@ void BaseScene::customRender(float width, float height)
     glUseProgram(m_shader.generalShader() );
     Matrix4x4 viewMatrix;
     Matrix4x4 mvp;
-    const int tranformPosition = glGetUniformLocation(m_shader.generalShader(), "transformPosition");
 
+    if (m_saveImagesRequested) {
+        m_saveImagesRequested = false;
+        saveCameraImages();
+    }
     if (m_cameraIndex > 0) {
         // camera object view uses the lens of the camera object and the aspect ratio of its resolution
         const CameraObject &cameraObject = m_listCameraObject[m_cameraIndex-1];
@@ -86,8 +95,22 @@ void BaseScene::customRender(float width, float height)
     }
     viewMatrix = m_camera.getViewMatrix();
 
-    glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "projection"), 1, GL_FALSE,  mvp.m );
-    glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "view"), 1, GL_FALSE, viewMatrix.m );
+    renderScene(mvp, viewMatrix);
+    glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
+}
+
+/*!
+ * \brief BaseScene::renderScene
+ * renders the scene to the current framebuffer and viewport
+ * \param projection projection matrix
+ * \param view view matrix
+ */
+void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view)
+{
+    const int tranformPosition = glGetUniformLocation(m_shader.generalShader(), "transformPosition");
+
+    glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "projection"), 1, GL_FALSE,  projection.m );
+    glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "view"), 1, GL_FALSE, view.m );
     glUniform3f(tranformPosition, 0, 0, 0 );
     setupLight();
     glEnable(GL_DEPTH_TEST);
@@ -106,7 +129,51 @@ void BaseScene::customRender(float width, float height)
         }
     }
     glDisable(GL_DEPTH_TEST);
-    glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
+}
+
+/*!
+ * \brief BaseScene::requestSaveImages
+ * images of the camera objects are saved when the next frame is rendered
+ */
+void BaseScene::requestSaveImages()
+{
+    m_saveImagesRequested = true;
+}
+
+/*!
+ * \brief BaseScene::saveCameraImages
+ * saves image of every camera object to the output directory as
+ * <objects filename>_<timestamp>_<camera index>.png
+ */
+void BaseScene::saveCameraImages()
+{
+    if (m_outputDirectory.empty()) {
+        std::cerr << "outputDirectory is not set in general.ini, images are not saved" << std::endl;
+        return;
+    }
+    std::error_code error;
+    std::filesystem::create_directories(m_outputDirectory, error);
+    if (error) {
+        std::cerr << "Cannot create " << m_outputDirectory << ": " << error.message() << std::endl;
+        return;
+    }
+
+    char timestamp[32];
+    const time_t now = time(nullptr);
+    struct tm localTime;
+    localtime_r(&now, &localTime);
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", &localTime);
+
+    auto render = [this](const Matrix4x4 &projection, const Matrix4x4 &view) {
+        renderScene(projection, view);
+    };
+    for (int i=0;i<m_cameraCount;i++) {
+        const std::string filename = (std::filesystem::path(m_outputDirectory)
+                                      / (std::string(OBJECTS_NAME) + "_" + timestamp + "_" + std::to_string(i) + ".png")).string();
+        if (CameraImageSaver::save(m_listCameraObject[i], render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, filename)) {
+            std::cout << "Saved " << filename << std::endl;
+        }
+    }
 }
 
 /*!
@@ -129,13 +196,13 @@ void BaseScene::createCameraObjects()
 
 /*!
  * \brief BaseScene::createObjects
- * creates cubes and spot lights from objects0.dat
+ * creates cubes and spot lights from the objects file
  */
 void BaseScene::createObjects()
 {
     ObjectsConfig config;
 
-    const bool success = config.read(OBJECTS_PATH "objects0.dat");
+    const bool success = config.read(OBJECTS_PATH OBJECTS_NAME ".dat");
     // on failure ambient light is the default, so the floor is still visible
     m_ambientLight = config.getAmbientLight();
     if (!success) {
@@ -233,5 +300,6 @@ void BaseScene::setupVisualPosition()
     m_basePosition = config.getBasePosition();
     m_baseDirection = config.getBaseDirection();
     m_directionLine.setup(config.getDirectionLineWidth(), config.getDirectionLineHeight());
+    m_outputDirectory = config.getOutputDirectory();
     moveToCamera(0);
 }

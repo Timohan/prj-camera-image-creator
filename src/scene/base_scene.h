@@ -8,6 +8,7 @@
 #include "direction_line.h"
 #include "cameraobject.h"
 #include "objects_config.h"
+#include <string>
 #include <vector>
 
 class BaseScene
@@ -23,6 +24,7 @@ public:
     void moveToCamera(int index);
     void toggleDirectionLine();
     void toggleCameraObjects();
+    void requestSaveImages();
 
 private:
     CameraShader m_shader;
@@ -40,10 +42,14 @@ private:
     int m_cameraCount;
     bool m_cameraObjectsVisible;
     int m_cameraIndex;
+    std::string m_outputDirectory;
+    bool m_saveImagesRequested;
 
     void createCameraObjects();
     void createObjects();
     void setupLight();
+    void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view);
+    void saveCameraImages();
     void setupVisualPosition();
 };
 
