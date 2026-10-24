@@ -29,7 +29,7 @@ public:
     void requestSaveImages();
     void startTurn(int direction);
     void stopTurn(int direction);
-    void updateTurn();
+    bool updateTurn();
 
 private:
     CameraShader m_shader;

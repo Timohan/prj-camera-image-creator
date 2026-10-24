@@ -333,11 +333,12 @@ void BaseScene::stopTurn(int direction)
 /*!
  * \brief BaseScene::updateTurn
  * sets the camera direction by the time from the start of turning, this is called before every render
+ * \return true if the camera is turning
  */
-void BaseScene::updateTurn()
+bool BaseScene::updateTurn()
 {
     if (m_turnDirection == 0) {
-        return;
+        return false;
     }
     const std::chrono::duration<float, std::milli> elapsed = std::chrono::steady_clock::now() - m_turnStartTime;
     // full circle in moveSpeed*10 milliseconds, positive angle turns to the right
@@ -350,6 +351,7 @@ void BaseScene::updateTurn()
         return turned;
     };
     m_camera.setup(m_camera.getPosition(), turn(m_turnStartDirection), turn(m_turnStartUpVector));
+    return true;
 }
 
 /*!

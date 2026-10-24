@@ -32,7 +32,10 @@ int MainWindow::initCustomShader()
 
 void MainWindow::customBeforeRender()
 {
-    m_baseScene.updateTurn();
+    if (m_baseScene.updateTurn()) {
+        // renders continuously while turning, otherwise next frame waits for events
+        requestRender();
+    }
 }
 
 void MainWindow::customRender()
