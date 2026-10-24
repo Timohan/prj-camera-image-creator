@@ -19,6 +19,8 @@
 
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 #define CAMERA_NEAR_PLANE       0.1f
+// floor, direction lines and cubes are bent by the curve of the earth
+#define EARTH_RADIUS            6371000.0f
 // far plane reaches the corners of the floor
 #define CAMERA_FAR_PLANE        10000.0f
 
@@ -113,6 +115,8 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view)
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "projection"), 1, GL_FALSE,  projection.m );
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "view"), 1, GL_FALSE, view.m );
     glUniform3f(tranformPosition, 0, 0, 0 );
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthRadius"), EARTH_RADIUS);
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 1.0f);
     setupLight();
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
@@ -125,6 +129,8 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view)
         m_listCube[i].render();
     }
     if (m_cameraObjectsVisible) {
+        // camera objects are not bent by the earth curve
+        glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 0.0f);
         for (int i=0;i<m_cameraCount;i++) {
             m_listCameraObject[i].render();
         }

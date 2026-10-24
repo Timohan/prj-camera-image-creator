@@ -6,6 +6,8 @@
 
 // floor reaches 5 km to every direction, about the distance to the horizon for human eyes on a flat ground
 #define FLOOR_HALF_SIZE     5000.0f
+// floor and direction lines are made of pieces of this size, so they can be bent by the earth curve
+#define FLOOR_SEGMENT_SIZE  50.0f
 
 class Floor
 {

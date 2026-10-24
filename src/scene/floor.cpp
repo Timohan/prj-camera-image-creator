@@ -42,25 +42,32 @@ Floor::~Floor()
 
 int Floor::init()
 {
-    // one rectangle, texture is repeated on every tile and every other tile column/row
+    // grid of FLOOR_SEGMENT_SIZE squares, so the shader can bend it by the earth curve,
+    // texture is repeated on every tile and every other tile column/row
     // has reversed texture (mirrored repeat), so tile edges match each other
     std::vector<FloorVertice> listVertices;
-    const float x0 = -FLOOR_HALF_SIZE;
-    const float x1 = FLOOR_HALF_SIZE;
-    const float z0 = -FLOOR_HALF_SIZE;
-    const float z1 = FLOOR_HALF_SIZE;
-    const float s0 = (x0 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
-    const float s1 = (x1 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
-    const float t0 = (z0 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
-    const float t1 = (z1 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
+    const int segmentCount = static_cast<int>(FLOOR_HALF_SIZE*2.0f/FLOOR_SEGMENT_SIZE);
 
-    listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-    listVertices.push_back( { x1, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s1, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-    listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+    for (int z=0;z<segmentCount;z++) {
+        const float z0 = -FLOOR_HALF_SIZE + static_cast<float>(z)*FLOOR_SEGMENT_SIZE;
+        const float z1 = z0 + FLOOR_SEGMENT_SIZE;
+        const float t0 = (z0 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
+        const float t1 = (z1 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
+        for (int x=0;x<segmentCount;x++) {
+            const float x0 = -FLOOR_HALF_SIZE + static_cast<float>(x)*FLOOR_SEGMENT_SIZE;
+            const float x1 = x0 + FLOOR_SEGMENT_SIZE;
+            const float s0 = (x0 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
+            const float s1 = (x1 - FLOOR_TILE_START)/FLOOR_TILE_SIZE;
 
-    listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
-    listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
-    listVertices.push_back( { x0, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s0, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x1, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s1, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+
+            listVertices.push_back( { x0, 0.0f, z1,   0.0f, 1.0f, 0.0f,  s0, t1,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x1, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s1, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+            listVertices.push_back( { x0, 0.0f, z0,   0.0f, 1.0f, 0.0f,  s0, t0,   1.0f, 1.0f, 1.0f, 1.0f } );
+        }
+    }
 
     m_verticesCount = static_cast<int>(listVertices.size());
     glGenVertexArrays(1, &m_vertexArrayObject);

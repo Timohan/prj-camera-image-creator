@@ -20,7 +20,11 @@ GLuint CameraShader::m_shaderAttributeIndex[4] = {0,0,0,0};
 /*!
  * \brief CameraShader::m_vertShader
  *
- * simple 3D vertex shader
+ * 3D vertex shader. When earthCurve is 1.0, the flat world is bent on a sphere of
+ * earthRadius: point at horizontal distance r from the origin and height y moves to
+ * angle theta = r/earthRadius on the sphere, its height is along the sphere normal and
+ * its normal is rotated by theta. Small angle series are used, because
+ * earthRadius*(1 - cos(theta)) loses the precision of float.
  */
 const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
         "attribute vec3 normal;" \
@@ -33,12 +37,30 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
         "uniform mat4 view;" \
         "uniform mat4 projection;" \
         "uniform vec3 transformPosition;" \
+        "uniform float earthRadius;" \
+        "uniform float earthCurve;" \
         "void main()" \
         "{" \
-        "    worldNormal             = normal;" \
         "    texCoord                = tex_coord;" \
         "    colorLight              = color;" \
         "    vec3 pos                = transformPosition+vertex;" \
+        "    vec3 nor                = normal;" \
+        "    float r                 = length(pos.xz);" \
+        "    if (earthCurve > 0.5 && r > 0.0) {" \
+        "        vec2 dir            = pos.xz/r;" \
+        "        float theta         = r/earthRadius;" \
+        "        float theta2        = theta*theta;" \
+        "        float sinTheta      = theta*(1.0 - theta2/6.0);" \
+        "        float cosTheta      = 1.0 - theta2/2.0;" \
+        "        float drop          = r*r/(2.0*earthRadius)*(1.0 - theta2/12.0);" \
+        "        float horizontal    = r*(1.0 - theta2/6.0) + pos.y*sinTheta;" \
+        "        pos                 = vec3(dir.x*horizontal, pos.y*cosTheta - drop, dir.y*horizontal);" \
+        "        float radial        = dot(nor.xz, dir);" \
+        "        vec2 tangent        = nor.xz - dir*radial;" \
+        "        float newRadial     = radial*cosTheta + nor.y*sinTheta;" \
+        "        nor                 = vec3(tangent.x + dir.x*newRadial, nor.y*cosTheta - radial*sinTheta, tangent.y + dir.y*newRadial);" \
+        "    }" \
+        "    worldNormal             = nor;" \
         "    worldPosition           = pos;" \
         "    gl_Position             = projection*(view*(vec4(pos, 1.0)));" \
         "}";

@@ -3,6 +3,8 @@
 #include "floor.h"
 #include <application/tg_application.h>
 #include <vector>
+#include <algorithm>
+#include <math.h>
 
 TgApplication *getApplication();
 
@@ -58,17 +60,35 @@ int DirectionLine::init()
     const float length = DIRECTION_LINE_HALF_LENGTH;
     std::vector<DirectionLineVertice> listVertices;
 
-    // rectangle that faces up
+    // rectangle that faces up, divided into FLOOR_SEGMENT_SIZE pieces along its long side,
+    // so the shader can bend it by the earth curve same way as the floor
     auto addRectangle = [this, &listVertices](float x0, float z0, float x1, float z1) {
-        const float c[4][5] = {
-            { x0, z1, 0, 0 },
-            { x1, z1, 1, 0 },
-            { x1, z0, 1, 1 },
-            { x0, z0, 0, 1 },
-        };
+        const bool alongX = (x1 - x0) > (z1 - z0);
+        const float length = alongX ? x1 - x0 : z1 - z0;
+        const int pieceCount = std::max(1, static_cast<int>(ceilf(length/FLOOR_SEGMENT_SIZE)));
         const int order[6] = { 0, 1, 2, 0, 2, 3 };
-        for (int i : order) {
-            listVertices.push_back( { c[i][0], m_height, c[i][1], 0.0f, 1.0f, 0.0f, c[i][2], c[i][3], 1.0f, 1.0f, 1.0f, 1.0f } );
+        for (int piece=0;piece<pieceCount;piece++) {
+            // rates of the piece from the start and end of the rectangle
+            const float rate0 = static_cast<float>(piece)/static_cast<float>(pieceCount);
+            const float rate1 = static_cast<float>(piece + 1)/static_cast<float>(pieceCount);
+            const float px0 = alongX ? x0 + (x1 - x0)*rate0 : x0;
+            const float px1 = alongX ? x0 + (x1 - x0)*rate1 : x1;
+            const float pz0 = alongX ? z0 : z0 + (z1 - z0)*rate0;
+            const float pz1 = alongX ? z1 : z0 + (z1 - z0)*rate1;
+            // texture s goes from x0 to x1 and t from z1 to z0 on the whole rectangle
+            const float s0 = alongX ? rate0 : 0.0f;
+            const float s1 = alongX ? rate1 : 1.0f;
+            const float t0 = alongX ? 1.0f : 1.0f - rate0;
+            const float t1 = alongX ? 0.0f : 1.0f - rate1;
+            const float c[4][4] = {
+                { px0, pz1, s0, t1 },
+                { px1, pz1, s1, t1 },
+                { px1, pz0, s1, t0 },
+                { px0, pz0, s0, t0 },
+            };
+            for (int i : order) {
+                listVertices.push_back( { c[i][0], m_height, c[i][1], 0.0f, 1.0f, 0.0f, c[i][2], c[i][3], 1.0f, 1.0f, 1.0f, 1.0f } );
+            }
         }
     };
     // front-rear line
