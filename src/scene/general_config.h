@@ -15,6 +15,8 @@
  * moveSpeed: camera turns full circle in moveSpeed*10 milliseconds,
  * moveSpeedMouseWheel: one mouse wheel step moves the camera moveSpeedMouseWheel mm,
  * they are read separately and they are 1000 if they are missing.
+ * cameraObjectsFile is the file of the camera objects in the configs folder,
+ * it is read separately and it is cameraobjects.ini if it is missing.
  */
 class GeneralConfig
 {
@@ -30,6 +32,7 @@ public:
     const std::string &getOutputDirectory() const;
     float getMoveSpeed() const;
     float getMoveSpeedMouseWheel() const;
+    const std::string &getCameraObjectsFile() const;
 
 private:
     VECTOR3 m_basePosition;     // in opengl units
@@ -39,6 +42,7 @@ private:
     std::string m_outputDirectory;
     float m_moveSpeed;              // milliseconds
     float m_moveSpeedMouseWheel;    // mm
+    std::string m_cameraObjectsFile;
 };
 
 #endif // GENERAL_CONFIG_H

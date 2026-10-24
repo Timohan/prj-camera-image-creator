@@ -98,6 +98,17 @@ bool CameraObjectsConfig::read(const std::string &filename)
             return false;
         }
         camera.focusDistance = focusDistance/MM_TO_OPENGL_UNIT;
+        std::string distortionModel = "pinhole";
+        ini.getString("cameraObjectDistortionModel" + index, &distortionModel);
+        if (distortionModel != "pinhole" && distortionModel != "fisheye") {
+            std::cerr << filename << ": cameraObjectDistortionModel" << number << " must be pinhole or fisheye" << std::endl;
+            return false;
+        }
+        camera.fisheye = distortionModel == "fisheye";
+        if (!readOptional(ini, "cameraObjectFisheyeDistortionParameters" + index, camera.fisheyeDistortion, 4, false)
+            || !readOptional(ini, "cameraObjectFieldOfView" + index, &camera.fieldOfView, 1, true)) {
+            return false;
+        }
         camera.position.x /= MM_TO_OPENGL_UNIT;
         camera.position.y /= MM_TO_OPENGL_UNIT;
         camera.position.z /= MM_TO_OPENGL_UNIT;

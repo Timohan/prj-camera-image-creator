@@ -9,9 +9,10 @@
 /*!
  * \brief CameraImageSaver
  * Saves the image of a camera object as png. The scene is rendered offscreen with
- * the pinhole projection of the camera (resolution, focal length, sensor size,
- * principal point, roll), then depth of field (aperture, focus distance) and lens
- * distortion (radial k1-k6, tangential p1-p2, OpenCV camera model) are simulated with OpenCV.
+ * the projection of the camera (resolution, focal length, sensor size,
+ * principal point, roll), lens distortion is simulated with OpenCV pinhole model
+ * (radial k1-k6, tangential p1-p2) or OpenCV fisheye model (k1-k4), then
+ * depth of field (aperture, focus distance) is simulated.
  */
 class CameraImageSaver
 {
@@ -23,8 +24,13 @@ public:
                      float zNear, float zFar, const std::string &filename);
 
 private:
-    static bool renderImage(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar,
-                            const cv::Rect &area, cv::Mat *image, cv::Mat *depth);
+    static bool createPinholeImage(const CameraObject &camera, const RenderFunction &render,
+                                   float zNear, float zFar, cv::Mat *image);
+    static bool createFisheyeImage(const CameraObject &camera, const RenderFunction &render,
+                                   float zNear, float zFar, cv::Mat *image);
+    static bool renderImage(const RenderFunction &render, const Matrix4x4 &projection, const Matrix4x4 &view,
+                            float zNear, float zFar, int width, int height, cv::Mat *image, cv::Mat *depth);
+    static cv::Vec3b sampleLinear(const cv::Mat &image, float column, float row);
     static void applyDepthOfField(const CameraObjectConfig &config, const cv::Mat &depth, cv::Mat *image);
     static cv::Rect getDistortedArea(const cv::Mat &cameraMatrix, const cv::Mat &distortion, int width, int height);
 };

@@ -4,6 +4,7 @@
 #include <opencv2/calib3d.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/utility.hpp>
 #include <algorithm>
 #include <iostream>
 #include <math.h>
@@ -18,6 +19,12 @@
 #define DISTORTION_MAX_AREA_RATE    3
 // points on each image edge used to find the area the distortion needs
 #define DISTORTION_EDGE_POINTS      64
+// fisheye cube face size limits in pixels
+#define FISHEYE_MIN_FACE_SIZE       256
+#define FISHEYE_MAX_FACE_SIZE       4096
+// cube face sees this many pixels more on every side than 90 degrees
+#define FISHEYE_FACE_MARGIN_PIXELS  2.0f
+#define FISHEYE_NEWTON_ITERATIONS   20
 
 /*!
  * \brief CameraImageSaver::save
@@ -30,6 +37,28 @@
  */
 bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &render,
                             float zNear, float zFar, const std::string &filename)
+{
+    cv::Mat image;
+    const bool success = camera.getConfig().fisheye ? createFisheyeImage(camera, render, zNear, zFar, &image)
+                                                    : createPinholeImage(camera, render, zNear, zFar, &image);
+    if (!success) {
+        return false;
+    }
+    if (!cv::imwrite(filename, image)) {
+        std::cerr << "Cannot save " << filename << std::endl;
+        return false;
+    }
+    return true;
+}
+
+/*!
+ * \brief CameraImageSaver::createPinholeImage
+ * creates the image of the OpenCV pinhole camera model with radial (k1-k6) and tangential (p1-p2) distortion
+ * \param image returns the BGR image
+ * \return true on success
+ */
+bool CameraImageSaver::createPinholeImage(const CameraObject &camera, const RenderFunction &render,
+                                          float zNear, float zFar, cv::Mat *image)
 {
     const CameraObjectConfig &config = camera.getConfig();
     const int width = static_cast<int>(lroundf(config.resolutionWidth));
@@ -50,12 +79,18 @@ bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &re
     // distorted image needs pixels from outside of the undistorted image, so render a larger area
     const cv::Rect area = hasDistortion ? getDistortedArea(cameraMatrix, distortion, width, height)
                                         : cv::Rect(0, 0, width, height);
-    cv::Mat image, depth;
+    cv::Mat depth;
 
-    if (!renderImage(camera, render, zNear, zFar, area, &image, &depth)) {
+    // OpenCV pixel centers are at whole numbers, so the edge of the first pixel is at -0.5
+    const Matrix4x4 projection = camera.getImageProjectionMatrix(static_cast<float>(area.x) - 0.5f,
+                                                                 static_cast<float>(area.y) - 0.5f,
+                                                                 static_cast<float>(area.width),
+                                                                 static_cast<float>(area.height),
+                                                                 zNear, zFar);
+    if (!renderImage(render, projection, camera.getViewMatrix(), zNear, zFar, area.width, area.height, image, &depth)) {
         return false;
     }
-    applyDepthOfField(config, depth, &image);
+    applyDepthOfField(config, depth, image);
 
     if (hasDistortion) {
         // undistortPoints gives for every pixel of the distorted image its place in the undistorted image
@@ -76,27 +111,179 @@ bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &re
             }
         }
         cv::Mat distorted;
-        cv::remap(image, distorted, mapX, mapY, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
-        image = distorted;
-    }
-
-    if (!cv::imwrite(filename, image)) {
-        std::cerr << "Cannot save " << filename << std::endl;
-        return false;
+        cv::remap(*image, distorted, mapX, mapY, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+        *image = distorted;
     }
     return true;
 }
 
 /*!
+ * \brief CameraImageSaver::createFisheyeImage
+ * creates the image of the OpenCV fisheye camera model (k1-k4):
+ * distorted angle theta_d = theta*(1 + k1*theta^2 + k2*theta^4 + k3*theta^6 + k4*theta^8),
+ * pixel = focal length in pixels * theta_d * (direction on the image) + principal point.
+ * Fisheye can see 180 degrees or more, so the scene is rendered to 6 faces of a cube
+ * around the camera and every pixel takes its color from the face its ray hits.
+ * Rays wider than the field of view of the lens are black.
+ * \param image returns the BGR image
+ * \return true on success
+ */
+bool CameraImageSaver::createFisheyeImage(const CameraObject &camera, const RenderFunction &render,
+                                          float zNear, float zFar, cv::Mat *image)
+{
+    const CameraObjectConfig &config = camera.getConfig();
+    const int width = static_cast<int>(lroundf(config.resolutionWidth));
+    const int height = static_cast<int>(lroundf(config.resolutionHeight));
+    const double fx = config.focalLength*config.resolutionWidth/config.sensorWidth;
+    const double fy = config.focalLength*config.resolutionHeight/config.sensorHeight;
+    const double maxTheta = config.fieldOfView/2.0*M_PI/180.0;
+    const double k[4] = { config.fisheyeDistortion[0], config.fisheyeDistortion[1],
+                          config.fisheyeDistortion[2], config.fisheyeDistortion[3] };
+
+    // cube face has same pixel density at its center as the fisheye image at its center,
+    // face sees a bit more than 90 degrees, so the linear interpolation works on the face edges
+    GLint maxRenderbufferSize, maxViewport[2];
+    glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &maxRenderbufferSize);
+    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, maxViewport);
+    const int maxFaceSize = std::min({ FISHEYE_MAX_FACE_SIZE, static_cast<int>(maxRenderbufferSize),
+                                       static_cast<int>(maxViewport[0]), static_cast<int>(maxViewport[1]) });
+    const int faceSize = std::max(FISHEYE_MIN_FACE_SIZE,
+                                  std::min(maxFaceSize, static_cast<int>(ceil(2.0*std::max(fx, fy)))));
+    const float tanHalf = 1.0f + FISHEYE_FACE_MARGIN_PIXELS*2.0f/static_cast<float>(faceSize);
+
+    // faces: direction D and up vector U, right vector R = U x D is the right side of the face image
+    const VECTOR3 forward = camera.getDirection();
+    const VECTOR3 up = camera.getUpVector();
+    const VECTOR3 right = Math3D::Vec3Normalize(Math3D::Vec3Cross(up, forward));
+    auto negative = [](const VECTOR3 &v) { VECTOR3 n = { -v.x, -v.y, -v.z }; return n; };
+    struct Face {
+        VECTOR3 direction, up, right;
+        cv::Mat image, depth;
+    };
+    Face faces[6];
+    const VECTOR3 faceDirections[6] = { forward, right, negative(right), negative(forward), up, negative(up) };
+    const VECTOR3 faceUps[6] = { up, up, up, up, negative(forward), forward };
+
+    Matrix4x4 projection;
+    Math3D::MatrixPerspectiveFovLH(&projection, 2.0f*atanf(tanHalf), 1.0f, zNear, zFar);
+    const VECTOR3 position = camera.getPosition();
+    for (int i=0;i<6;i++) {
+        faces[i].direction = faceDirections[i];
+        faces[i].up = faceUps[i];
+        faces[i].right = Math3D::Vec3Cross(faceUps[i], faceDirections[i]);
+        VECTOR3 at;
+        at.x = position.x + faceDirections[i].x;
+        at.y = position.y + faceDirections[i].y;
+        at.z = position.z + faceDirections[i].z;
+        Matrix4x4 view;
+        Math3D::MatrixLookAtLH(&view, position, at, faceUps[i]);
+        if (!renderImage(render, projection, view, zNear, zFar, faceSize, faceSize, &faces[i].image, &faces[i].depth)) {
+            return false;
+        }
+    }
+
+    cv::Mat result(height, width, CV_8UC3, cv::Scalar(0, 0, 0));
+    cv::Mat distance(height, width, CV_32FC1, cv::Scalar(zFar));
+    cv::parallel_for_(cv::Range(0, height), [&](const cv::Range &rows) {
+        for (int y=rows.start;y<rows.end;y++) {
+            for (int x=0;x<width;x++) {
+                const double xd = (static_cast<double>(x) - config.principalPointX)/fx;
+                const double yd = (static_cast<double>(y) - config.principalPointY)/fy;
+                const double thetaD = sqrt(xd*xd + yd*yd);
+                // theta from theta_d with Newton's method
+                double theta = thetaD;
+                bool valid = true;
+                for (int iteration=0;iteration<FISHEYE_NEWTON_ITERATIONS;iteration++) {
+                    const double theta2 = theta*theta;
+                    const double value = theta*(1.0 + theta2*(k[0] + theta2*(k[1] + theta2*(k[2] + theta2*k[3])))) - thetaD;
+                    const double derivative = 1.0 + theta2*(3.0*k[0] + theta2*(5.0*k[1] + theta2*(7.0*k[2] + theta2*9.0*k[3])));
+                    if (derivative <= 0.0) {
+                        valid = false;
+                        break;
+                    }
+                    const double step = value/derivative;
+                    theta -= step;
+                    if (fabs(step) < 1e-10) {
+                        break;
+                    }
+                }
+                if (!valid || theta < 0.0 || theta > maxTheta || theta > M_PI) {
+                    continue;
+                }
+                // ray in camera coordinates (x right, y down, z forward) and in the world
+                const double sinTheta = sin(theta);
+                const double rayX = thetaD > 0.0 ? sinTheta*xd/thetaD : 0.0;
+                const double rayY = thetaD > 0.0 ? sinTheta*yd/thetaD : 0.0;
+                const double rayZ = cos(theta);
+                VECTOR3 ray;
+                ray.x = static_cast<float>(right.x*rayX - up.x*rayY + forward.x*rayZ);
+                ray.y = static_cast<float>(right.y*rayX - up.y*rayY + forward.y*rayZ);
+                ray.z = static_cast<float>(right.z*rayX - up.z*rayY + forward.z*rayZ);
+
+                int faceIndex = 0;
+                float faceDot = -2.0f;
+                for (int i=0;i<6;i++) {
+                    const float dot = Math3D::Vec3Dot(ray, faces[i].direction);
+                    if (dot > faceDot) {
+                        faceDot = dot;
+                        faceIndex = i;
+                    }
+                }
+                const Face &face = faces[faceIndex];
+                const float faceX = Math3D::Vec3Dot(ray, face.right)/faceDot/tanHalf;
+                const float faceY = Math3D::Vec3Dot(ray, face.up)/faceDot/tanHalf;
+                const float column = (faceX + 1.0f)/2.0f*static_cast<float>(faceSize) - 0.5f;
+                const float row = (1.0f - faceY)/2.0f*static_cast<float>(faceSize) - 0.5f;
+                result.at<cv::Vec3b>(y, x) = sampleLinear(face.image, column, row);
+                // depth of the face is along the face direction, distance is along the ray
+                const int depthColumn = std::min(faceSize - 1, std::max(0, static_cast<int>(lroundf(column))));
+                const int depthRow = std::min(faceSize - 1, std::max(0, static_cast<int>(lroundf(row))));
+                distance.at<float>(y, x) = std::min(zFar, face.depth.at<float>(depthRow, depthColumn)/faceDot);
+            }
+        }
+    });
+    applyDepthOfField(config, distance, &result);
+    *image = result;
+    return true;
+}
+
+/*!
+ * \brief CameraImageSaver::sampleLinear
+ * \param image BGR image
+ * \param column, row position in pixels, pixel centers are at whole numbers
+ * \return linearly interpolated color, positions outside of the image use the edge pixels
+ */
+cv::Vec3b CameraImageSaver::sampleLinear(const cv::Mat &image, float column, float row)
+{
+    const float x = std::min(static_cast<float>(image.cols - 1), std::max(0.0f, column));
+    const float y = std::min(static_cast<float>(image.rows - 1), std::max(0.0f, row));
+    const int x0 = static_cast<int>(x);
+    const int y0 = static_cast<int>(y);
+    const int x1 = std::min(x0 + 1, image.cols - 1);
+    const int y1 = std::min(y0 + 1, image.rows - 1);
+    const float rateX = x - static_cast<float>(x0);
+    const float rateY = y - static_cast<float>(y0);
+    cv::Vec3b color;
+    for (int c=0;c<3;c++) {
+        const float top = image.at<cv::Vec3b>(y0, x0)[c]*(1.0f - rateX) + image.at<cv::Vec3b>(y0, x1)[c]*rateX;
+        const float bottom = image.at<cv::Vec3b>(y1, x0)[c]*(1.0f - rateX) + image.at<cv::Vec3b>(y1, x1)[c]*rateX;
+        color[c] = static_cast<uchar>(lroundf(top*(1.0f - rateY) + bottom*rateY));
+    }
+    return color;
+}
+
+/*!
  * \brief CameraImageSaver::renderImage
- * renders the area of the camera image offscreen
- * \param area area in image pixels, it can be larger than the image
- * \param image returns BGR image of the area
+ * renders the scene offscreen
+ * \param projection projection matrix
+ * \param view view matrix
+ * \param width, height size of the image in pixels
+ * \param image returns BGR image
  * \param depth returns distance from the camera plane in opengl units for every pixel
  * \return true on success
  */
-bool CameraImageSaver::renderImage(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar,
-                                   const cv::Rect &area, cv::Mat *image, cv::Mat *depth)
+bool CameraImageSaver::renderImage(const RenderFunction &render, const Matrix4x4 &projection, const Matrix4x4 &view,
+                                   float zNear, float zFar, int width, int height, cv::Mat *image, cv::Mat *depth)
 {
     GLint oldFramebuffer, oldViewport[4], oldPackAlignment;
     GLfloat oldClearColor[4];
@@ -111,34 +298,28 @@ bool CameraImageSaver::renderImage(const CameraObject &camera, const RenderFunct
     glGenFramebuffers(1, &framebuffer);
     glGenRenderbuffers(2, renderbuffers);
     glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[0]);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, area.width, area.height);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
     glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[1]);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, area.width, area.height);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffers[0]);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderbuffers[1]);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Cannot create framebuffer " << area.width << "x" << area.height << std::endl;
+        std::cerr << "Cannot create framebuffer " << width << "x" << height << std::endl;
         success = false;
     } else {
-        // OpenCV pixel centers are at whole numbers, so the edge of the first pixel is at -0.5
-        const Matrix4x4 projection = camera.getImageProjectionMatrix(static_cast<float>(area.x) - 0.5f,
-                                                                     static_cast<float>(area.y) - 0.5f,
-                                                                     static_cast<float>(area.width),
-                                                                     static_cast<float>(area.height),
-                                                                     zNear, zFar);
-        glViewport(0, 0, area.width, area.height);
+        glViewport(0, 0, width, height);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        render(projection, camera.getViewMatrix());
+        render(projection, view);
 
-        cv::Mat flippedImage(area.height, area.width, CV_8UC3);
-        cv::Mat flippedDepth(area.height, area.width, CV_32FC1);
+        cv::Mat flippedImage(height, width, CV_8UC3);
+        cv::Mat flippedDepth(height, width, CV_32FC1);
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
-        glReadPixels(0, 0, area.width, area.height, GL_BGR, GL_UNSIGNED_BYTE, flippedImage.data);
-        glReadPixels(0, 0, area.width, area.height, GL_DEPTH_COMPONENT, GL_FLOAT, flippedDepth.data);
+        glReadPixels(0, 0, width, height, GL_BGR, GL_UNSIGNED_BYTE, flippedImage.data);
+        glReadPixels(0, 0, width, height, GL_DEPTH_COMPONENT, GL_FLOAT, flippedDepth.data);
         // opengl rows start from the bottom
         cv::flip(flippedImage, *image, 0);
         cv::flip(flippedDepth, *depth, 0);

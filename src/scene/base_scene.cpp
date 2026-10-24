@@ -204,13 +204,13 @@ void BaseScene::saveCameraImages()
 
 /*!
  * \brief BaseScene::createCameraObjects
- * creates camera objects from cameraobjects.ini
+ * creates camera objects from cameraObjectsFile of general.ini
  */
 void BaseScene::createCameraObjects()
 {
     CameraObjectsConfig config;
 
-    if (!config.read(CONFIGS_PATH "cameraobjects.ini")) {
+    if (!config.read(std::string(CONFIGS_PATH) + m_cameraObjectsFile)) {
         return;
     }
     m_cameraCount = config.getCameraCount();
@@ -465,5 +465,6 @@ void BaseScene::setupVisualPosition()
     m_outputDirectory = config.getOutputDirectory();
     m_moveSpeed = config.getMoveSpeed();
     m_moveSpeedMouseWheel = config.getMoveSpeedMouseWheel();
+    m_cameraObjectsFile = config.getCameraObjectsFile();
     moveToCamera(0);
 }
