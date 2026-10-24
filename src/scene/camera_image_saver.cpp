@@ -21,6 +21,10 @@
 #define DISTORTION_MAX_AREA_RATE    3
 // points on each image edge used to find the area the distortion needs
 #define DISTORTION_EDGE_POINTS      64
+// undistortPoints iterations, OpenCV default 5 iterations does not converge on the image edges
+// of strong barrel distortion, iterations stop when the error is below the epsilon in pixels
+#define DISTORTION_MAX_ITERATIONS   200
+#define DISTORTION_EPSILON_PIXELS   0.001
 // fisheye cube face size limits in pixels
 #define FISHEYE_MIN_FACE_SIZE       256
 #define FISHEYE_MAX_FACE_SIZE       4096
@@ -213,7 +217,8 @@ bool CameraImageSaver::createPinholeImage(const CameraObject &camera, const Rend
                 distortedPoints.push_back(cv::Point2f(static_cast<float>(x), static_cast<float>(y)));
             }
         }
-        cv::undistortPoints(distortedPoints, undistortedPoints, cameraMatrix, distortion, cv::noArray(), cameraMatrix);
+        cv::undistortPoints(distortedPoints, undistortedPoints, cameraMatrix, distortion, cv::noArray(), cameraMatrix,
+                            getUndistortCriteria());
         cv::Mat mapX(height, width, CV_32FC1), mapY(height, width, CV_32FC1);
         for (int y=0;y<height;y++) {
             for (int x=0;x<width;x++) {
@@ -565,6 +570,16 @@ void CameraImageSaver::applyDepthOfField(const CameraObjectConfig &config, const
 }
 
 /*!
+ * \brief CameraImageSaver::getUndistortCriteria
+ * \return termination criteria of undistortPoints
+ */
+cv::TermCriteria CameraImageSaver::getUndistortCriteria()
+{
+    return cv::TermCriteria(cv::TermCriteria::COUNT + cv::TermCriteria::EPS,
+                            DISTORTION_MAX_ITERATIONS, DISTORTION_EPSILON_PIXELS);
+}
+
+/*!
  * \brief CameraImageSaver::getDistortedArea
  * finds the area of the undistorted image the distorted image uses
  * \return area in image pixels, at least the image itself
@@ -581,7 +596,8 @@ cv::Rect CameraImageSaver::getDistortedArea(const cv::Mat &cameraMatrix, const c
         edgePoints.push_back(cv::Point2f(0.0f, y));
         edgePoints.push_back(cv::Point2f(static_cast<float>(width - 1), y));
     }
-    cv::undistortPoints(edgePoints, undistortedPoints, cameraMatrix, distortion, cv::noArray(), cameraMatrix);
+    cv::undistortPoints(edgePoints, undistortedPoints, cameraMatrix, distortion, cv::noArray(), cameraMatrix,
+                        getUndistortCriteria());
 
     float left = 0.0f, top = 0.0f;
     float right = static_cast<float>(width - 1), bottom = static_cast<float>(height - 1);

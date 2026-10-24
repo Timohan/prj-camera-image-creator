@@ -38,6 +38,7 @@ private:
     static bool saveData(const CameraObject &camera, int cameraNumber, const cv::Mat &distance, const std::string &filename);
     static cv::Vec3b sampleLinear(const cv::Mat &image, float column, float row);
     static void applyDepthOfField(const CameraObjectConfig &config, const cv::Mat &depth, cv::Mat *image);
+    static cv::TermCriteria getUndistortCriteria();
     static cv::Rect getDistortedArea(const cv::Mat &cameraMatrix, const cv::Mat &distortion, int width, int height);
 };
 
