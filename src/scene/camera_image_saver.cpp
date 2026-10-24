@@ -34,7 +34,7 @@
 #define DISTANCE_NO_VIEW            -2.0f
 // camera and lens information block after the distances in the data file
 #define DATA_CAMERA_INFO_MAGIC      "CAMI"
-#define DATA_CAMERA_INFO_VERSION    1
+#define DATA_CAMERA_INFO_VERSION    2
 
 /*!
  * \brief CameraImageSaver::save
@@ -70,12 +70,13 @@ bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &re
  * double distance in mm for every pixel row by row from the top left pixel, sky is as far
  * as earth's orbit and pixels that do not see anything (outside of the lens field of view) are 0,
  * then camera and lens information:
- * char[4] "CAMI", uint32_t version (1), uint32_t camera number, uint32_t distortion model (0 pinhole, 1 fisheye),
+ * char[4] "CAMI", uint32_t version (2), uint32_t camera number, uint32_t distortion model (0 pinhole, 1 fisheye),
  * and doubles: position x/y/z (mm), direction x/y/z, up vector x/y/z (with roll), roll (degrees),
  * focal length (mm), sensor width/height (mm), resolution width/height (pixels),
  * focal length x/y (pixels), principal point x/y (pixels), radial distortion k1-k6,
  * tangential distortion p1-p2, fisheye distortion k1-k4, field of view (degrees),
- * aperture (f-number), focus distance (mm).
+ * aperture (f-number), focus distance (mm), yaw (degrees, 0 is +z, positive turns to +x),
+ * pitch (degrees, positive is up).
  * World coordinates: x right, y up, z forward (left-handed).
  * \param camera camera object
  * \param cameraNumber number of the camera
@@ -149,6 +150,9 @@ bool CameraImageSaver::saveData(const CameraObject &camera, int cameraNumber, co
     writeDouble(config.fieldOfView);
     writeDouble(config.aperture);
     writeDouble(static_cast<double>(config.focusDistance)*MM_TO_OPENGL_UNIT);
+    const VECTOR3 direction = camera.getDirection();
+    writeDouble(atan2(static_cast<double>(direction.x), static_cast<double>(direction.z))*180.0/M_PI);
+    writeDouble(asin(std::max(-1.0, std::min(1.0, static_cast<double>(direction.y))))*180.0/M_PI);
 
     if (!file.good()) {
         std::cerr << "Cannot save " << filename << std::endl;
