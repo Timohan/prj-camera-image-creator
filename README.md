@@ -47,6 +47,21 @@ of configs/general.ini, key 'c' still toggles them.
 
 # Tools
 
+## tools/takepictures.py
+Takes the pictures of every .dat file of the objects folder (like `--takePictures --camerasVisible=0 --objectsFile=<file>`)
+into outputDirectory of configs/general.ini. Build the program first with make.
+
+    python3 tools/takepictures.py [--t<number of threads>]
+
+--t<number> runs that many programs at the same time, for example `--t8`, default is 1.
+Each program uses about 0.5 GB memory, on a 16 core machine 8 threads was about 7 times faster than 1 thread,
+more than 8 threads was not faster.
+
+Previous files of outputDirectory are first moved to /tmp/image-creator-<timestamp>.
+If all pictures are created, the previous files are removed.
+If even one objects file fails, the script stops, prints which file failed, removes the new files
+and moves the previous files back to outputDirectory.
+
 ## tools/genobjects.py
 Generates random objects files into the objects folder. Needs only Python 3.
 
