@@ -17,6 +17,9 @@
 #define OBJECTS_PATH            "objects/"
 #endif
 
+// saved images are rendered at most this many times larger in width and height and shrunk
+#define MAX_SUPERSAMPLING       4
+
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 #define MM_TO_OPENGL_UNIT       1000.0f
 #define CAMERA_NEAR_PLANE       0.1f
@@ -212,32 +215,12 @@ void BaseScene::requestSaveImages()
 }
 
 /*!
- * \brief getScaledConfig
- * camera with the same lens and sensor, but scale times the resolution, so the image shows the same view
- * \param config camera
- * \param scale imageOutputScale of general.ini
- * \return camera of the scaled resolution
- */
-static CameraObjectConfig getScaledConfig(const CameraObjectConfig &config, float scale)
-{
-    CameraObjectConfig scaled = config;
-    scaled.resolutionWidth = std::max(1.0f, roundf(config.resolutionWidth*scale));
-    scaled.resolutionHeight = std::max(1.0f, roundf(config.resolutionHeight*scale));
-    // rounding can change the scale a bit, principal point uses the exact scale of the resolution
-    const float scaleX = scaled.resolutionWidth/config.resolutionWidth;
-    const float scaleY = scaled.resolutionHeight/config.resolutionHeight;
-    // pixel centers are at whole numbers, so the edge of the image is at -0.5
-    scaled.principalPointX = (config.principalPointX + 0.5f)*scaleX - 0.5f;
-    scaled.principalPointY = (config.principalPointY + 0.5f)*scaleY - 0.5f;
-    return scaled;
-}
-
-/*!
  * \brief BaseScene::saveCameraImages
  * saves image of every camera object to the output directory as
  * <objects filename>_<timestamp>_<camera number>.png, camera number is 1-cameraCount as in cameraobjects.ini,
  * and distance of every pixel to <objects filename>_<timestamp>_<camera number>.dat,
- * resolution of the images is imageOutputScale times the resolution of the camera
+ * resolution of the images is imageOutputScale times the resolution of the camera,
+ * images smaller than the camera resolution are rendered supersampling times larger and shrunk (anti-aliasing)
  */
 void BaseScene::saveCameraImages()
 {
@@ -258,6 +241,8 @@ void BaseScene::saveCameraImages()
     localtime_r(&now, &localTime);
     strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", &localTime);
 
+    // smaller images are rendered larger and shrunk, but never larger than the resolution of the camera
+    const int supersampling = std::max(1, std::min(MAX_SUPERSAMPLING, static_cast<int>(floorf(1.0f/m_imageOutputScale + 0.0001f))));
     for (int i=0;i<m_cameraCount;i++) {
         auto render = [this, i](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 *distanceFrom) {
             renderScene(projection, view, i, distanceFrom);
@@ -265,8 +250,8 @@ void BaseScene::saveCameraImages()
         const std::string filename = (std::filesystem::path(m_outputDirectory)
                                       / (std::filesystem::path(m_objectsFile).stem().string() + "_" + timestamp + "_" + std::to_string(i + 1))).string();
         CameraObject camera;
-        camera.setup(getScaledConfig(m_listCameraObject[i].getConfig(), m_imageOutputScale), 1.0f);
-        if (CameraImageSaver::save(camera, render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE,
+        camera.setup(CameraImageSaver::getScaledConfig(m_listCameraObject[i].getConfig(), m_imageOutputScale), 1.0f);
+        if (CameraImageSaver::save(camera, render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, supersampling,
                                    i + 1, filename + ".png", filename + ".dat")) {
             std::cout << "Saved " << filename << ".png and .dat" << std::endl;
         }

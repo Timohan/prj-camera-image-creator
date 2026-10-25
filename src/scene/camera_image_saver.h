@@ -24,8 +24,9 @@ public:
     typedef std::function<void(const Matrix4x4 &projection, const Matrix4x4 &view,
                                const VECTOR3 *distanceFrom)> RenderFunction;
 
-    static bool save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar,
+    static bool save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar, int supersampling,
                      int cameraNumber, const std::string &imageFilename, const std::string &dataFilename);
+    static CameraObjectConfig getScaledConfig(const CameraObjectConfig &config, float scale);
 
 private:
     static bool createPinholeImage(const CameraObject &camera, const RenderFunction &render,
@@ -37,6 +38,7 @@ private:
                             cv::Mat *image, cv::Mat *depth, cv::Mat *distance);
     static bool saveData(const CameraObject &camera, int cameraNumber, const cv::Mat &distance, const std::string &filename);
     static cv::Vec3b sampleLinear(const cv::Mat &image, float column, float row);
+    static void shrinkImage(int supersampling, cv::Mat *image, cv::Mat *distance);
     static void applyDepthOfField(const CameraObjectConfig &config, const cv::Mat &depth, cv::Mat *image);
     static cv::TermCriteria getUndistortCriteria();
     static cv::Rect getDistortedArea(const cv::Mat &cameraMatrix, const cv::Mat &distortion, int width, int height);

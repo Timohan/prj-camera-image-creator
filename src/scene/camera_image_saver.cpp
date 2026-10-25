@@ -6,6 +6,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/utility.hpp>
 #include <algorithm>
+#include <cfloat>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -41,30 +42,103 @@
 #define DATA_CAMERA_INFO_VERSION    2
 
 /*!
+ * \brief CameraImageSaver::getScaledConfig
+ * camera with the same lens and sensor, but scale times the resolution, so the image shows the same view
+ * \param config camera
+ * \param scale scale of the resolution
+ * \return camera of the scaled resolution
+ */
+CameraObjectConfig CameraImageSaver::getScaledConfig(const CameraObjectConfig &config, float scale)
+{
+    CameraObjectConfig scaled = config;
+    scaled.resolutionWidth = std::max(1.0f, roundf(config.resolutionWidth*scale));
+    scaled.resolutionHeight = std::max(1.0f, roundf(config.resolutionHeight*scale));
+    // rounding can change the scale a bit, principal point uses the exact scale of the resolution
+    const float scaleX = scaled.resolutionWidth/config.resolutionWidth;
+    const float scaleY = scaled.resolutionHeight/config.resolutionHeight;
+    // pixel centers are at whole numbers, so the edge of the image is at -0.5
+    scaled.principalPointX = (config.principalPointX + 0.5f)*scaleX - 0.5f;
+    scaled.principalPointY = (config.principalPointY + 0.5f)*scaleY - 0.5f;
+    return scaled;
+}
+
+/*!
  * \brief CameraImageSaver::save
  * \param camera camera object to save the image of
  * \param render renders the scene
  * \param zNear near plane
  * \param zFar far plane
+ * \param supersampling image is rendered supersampling times larger in width and height and shrunk to the resolution
+ * of the camera: colors are averaged and distance is the lower median of the distances of the pixel,
+ * so it is a distance of the surface that covers most of the pixel (sky and no view count as farthest)
  * \param cameraNumber number of the camera (1-cameraCount), it is saved to the data file
  * \param imageFilename full path of the png file
  * \param dataFilename full path of the binary data file
  * \return true on success
  */
-bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar,
+bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar, int supersampling,
                             int cameraNumber, const std::string &imageFilename, const std::string &dataFilename)
 {
     cv::Mat image, distance;
-    const bool success = camera.getConfig().fisheye ? createFisheyeImage(camera, render, zNear, zFar, &image, &distance)
-                                                    : createPinholeImage(camera, render, zNear, zFar, &image, &distance);
+    supersampling = std::max(1, supersampling);
+    CameraObject renderCamera;
+    renderCamera.setup(getScaledConfig(camera.getConfig(), static_cast<float>(supersampling)), 1.0f);
+    const bool success = camera.getConfig().fisheye ? createFisheyeImage(renderCamera, render, zNear, zFar, &image, &distance)
+                                                    : createPinholeImage(renderCamera, render, zNear, zFar, &image, &distance);
     if (!success) {
         return false;
+    }
+    if (supersampling > 1) {
+        shrinkImage(supersampling, &image, &distance);
     }
     if (!cv::imwrite(imageFilename, image)) {
         std::cerr << "Cannot save " << imageFilename << std::endl;
         return false;
     }
     return saveData(camera, cameraNumber, distance, dataFilename);
+}
+
+/*!
+ * \brief CameraImageSaver::shrinkImage
+ * shrinks the image and distance supersampling times smaller in width and height,
+ * colors are the average of the pixels and distance is the lower median of the distances of the pixels
+ * \param supersampling size of the pixel block that becomes one pixel
+ * \param image BGR image, its size must be divisible by supersampling
+ * \param distance distance of every pixel, DISTANCE_SKY or DISTANCE_NO_VIEW
+ */
+void CameraImageSaver::shrinkImage(int supersampling, cv::Mat *image, cv::Mat *distance)
+{
+    const int width = image->cols/supersampling;
+    const int height = image->rows/supersampling;
+    cv::Mat smallImage;
+    cv::resize(*image, smallImage, cv::Size(width, height), 0.0, 0.0, cv::INTER_AREA);
+
+    // sky is farther than any distance and no view is the farthest
+    auto order = [](float value) {
+        if (value >= 0.0f) {
+            return value;
+        }
+        return value == DISTANCE_SKY ? FLT_MAX/2.0f : FLT_MAX;
+    };
+    cv::Mat smallDistance(height, width, CV_32FC1);
+    std::vector<float> block(static_cast<size_t>(supersampling*supersampling));
+    const size_t median = (block.size() - 1)/2;
+    for (int y=0;y<height;y++) {
+        for (int x=0;x<width;x++) {
+            size_t i = 0;
+            for (int by=0;by<supersampling;by++) {
+                const float *row = distance->ptr<float>(y*supersampling + by) + x*supersampling;
+                for (int bx=0;bx<supersampling;bx++) {
+                    block[i++] = row[bx];
+                }
+            }
+            std::nth_element(block.begin(), block.begin() + static_cast<long>(median), block.end(),
+                             [&order](float a, float b) { return order(a) < order(b); });
+            smallDistance.at<float>(y, x) = block[median];
+        }
+    }
+    *image = smallImage;
+    *distance = smallDistance;
 }
 
 /*!
