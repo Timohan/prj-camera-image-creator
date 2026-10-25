@@ -17,8 +17,9 @@
 class BaseScene
 {
 public:
-    // objectsFile: file in the objects folder, if it is empty, objectsFile of general.ini is used
-    explicit BaseScene(const std::string &objectsFile = std::string());
+    // objectsFile: file in the objects folder, if it is empty, objectsFile of general.ini is used,
+    // camerasVisible: 0 or 1, if it is -1, camerasVisible of general.ini is used
+    explicit BaseScene(const std::string &objectsFile = std::string(), int camerasVisible = -1);
     ~BaseScene();
     BaseScene(const BaseScene &) = delete;
     BaseScene &operator=(const BaseScene &) = delete;

@@ -39,6 +39,12 @@ it can be used together with --takePictures, for example:
 
     prj-camera-image-creator --objectsFile=objects5.dat --takePictures
 
+# Showing or hiding the cameras
+    prj-camera-image-creator --camerasVisible=0
+
+--camerasVisible=0 hides and --camerasVisible=1 shows the cameras at the start, instead of camerasVisible
+of configs/general.ini, key 'c' still toggles them.
+
 # Tools
 
 ## tools/genobjects.py

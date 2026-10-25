@@ -25,7 +25,7 @@
 // far plane reaches the corners of the floor
 #define CAMERA_FAR_PLANE        10000.0f
 
-BaseScene::BaseScene(const std::string &objectsFile) :
+BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_directionLineVisible(true),
     m_listCube(nullptr),
     m_cubeCount(0),
@@ -42,6 +42,10 @@ BaseScene::BaseScene(const std::string &objectsFile) :
     m_pitchDirection(0)
 {
     setupVisualPosition();
+    // camerasVisible of the command line is used instead of general.ini
+    if (camerasVisible >= 0) {
+        m_cameraObjectsVisible = camerasVisible != 0;
+    }
     createCameraObjects();
     createObjects();
 }
