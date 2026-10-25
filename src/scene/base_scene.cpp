@@ -506,5 +506,6 @@ void BaseScene::setupVisualPosition()
     m_moveSpeedMouseWheel = config.getMoveSpeedMouseWheel();
     m_cameraObjectsFile = config.getCameraObjectsFile();
     m_objectsFile = config.getObjectsFile();
+    m_cameraObjectsVisible = config.getCamerasVisible();
     moveToCamera(0);
 }

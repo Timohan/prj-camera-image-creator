@@ -31,6 +31,7 @@ GeneralConfig::GeneralConfig()
     m_moveSpeedMouseWheel = 1000.0f;
     m_cameraObjectsFile = "cameraobjects.ini";
     m_objectsFile = "objects0.dat";
+    m_camerasVisible = true;
 }
 
 /*!
@@ -61,6 +62,14 @@ bool GeneralConfig::read(const std::string &filename)
         && (!ini.getString("objectsFile", &m_objectsFile) || m_objectsFile.empty())) {
         m_objectsFile = "objects0.dat";
         std::cerr << filename << ": objectsFile is empty, using " << m_objectsFile << std::endl;
+    }
+    if (ini.hasKey("camerasVisible")) {
+        float visible;
+        if (ini.getFloat("camerasVisible", &visible)) {
+            m_camerasVisible = visible != 0.0f;
+        } else {
+            std::cerr << filename << ": camerasVisible is not 0 or 1, using " << (m_camerasVisible ? 1 : 0) << std::endl;
+        }
     }
     if (!ini.getVector("baseObjectPosition", &position)) {
         std::cerr << filename << ": baseObjectPosition is missing or invalid" << std::endl;
@@ -131,4 +140,9 @@ const std::string &GeneralConfig::getCameraObjectsFile() const
 const std::string &GeneralConfig::getObjectsFile() const
 {
     return m_objectsFile;
+}
+
+bool GeneralConfig::getCamerasVisible() const
+{
+    return m_camerasVisible;
 }
