@@ -1,8 +1,9 @@
 #include "mainwindow.h"
 #include <iostream>
 
-MainWindow::MainWindow(int width, int height, bool takePictures)
+MainWindow::MainWindow(int width, int height, bool takePictures, const std::string &objectsFile)
     : TgMainWindow(width, height, "prj-camera-image-creator"),
+    m_baseScene(objectsFile),
     m_cameraKeyListener(this),
     m_takePictures(takePictures),
     m_picturesRequested(false)

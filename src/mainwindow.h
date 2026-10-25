@@ -8,8 +8,9 @@
 class MainWindow : public TgMainWindow
 {
 public:
-    // takePictures: saves the pictures of the cameras at the start like the key s and exits
-    MainWindow(int width, int height, bool takePictures = false);
+    // takePictures: saves the pictures of the cameras at the start like the key s and exits,
+    // objectsFile: file in the objects folder, if it is empty, objectsFile of general.ini is used
+    MainWindow(int width, int height, bool takePictures = false, const std::string &objectsFile = std::string());
 
 protected:
     virtual int initCustomShader() override;

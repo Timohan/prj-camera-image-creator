@@ -25,7 +25,7 @@
 // far plane reaches the corners of the floor
 #define CAMERA_FAR_PLANE        10000.0f
 
-BaseScene::BaseScene() :
+BaseScene::BaseScene(const std::string &objectsFile) :
     m_directionLineVisible(true),
     m_listCube(nullptr),
     m_cubeCount(0),
@@ -34,6 +34,7 @@ BaseScene::BaseScene() :
     m_cameraCount(0),
     m_cameraObjectsVisible(true),
     m_cameraIndex(0),
+    m_objectsFile(objectsFile),
     m_saveImagesRequested(false),
     m_moveSpeed(1000.0f),
     m_moveSpeedMouseWheel(1000.0f),
@@ -505,7 +506,10 @@ void BaseScene::setupVisualPosition()
     m_moveSpeed = config.getMoveSpeed();
     m_moveSpeedMouseWheel = config.getMoveSpeedMouseWheel();
     m_cameraObjectsFile = config.getCameraObjectsFile();
-    m_objectsFile = config.getObjectsFile();
+    // objects file of the command line is used instead of general.ini
+    if (m_objectsFile.empty()) {
+        m_objectsFile = config.getObjectsFile();
+    }
     m_cameraObjectsVisible = config.getCamerasVisible();
     moveToCamera(0);
 }

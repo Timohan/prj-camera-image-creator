@@ -31,6 +31,14 @@ Starts the program, saves the pictures and data files of all cameras exactly lik
 (into outputDirectory of configs/general.ini, from the objects file of objectsFile) and then exits with code 0.
 If an unknown argument is given, the program prints the usage and exits with code 1.
 
+# Selecting the objects file
+    prj-camera-image-creator --objectsFile=objects1.dat
+
+Uses the given file of the objects folder instead of objectsFile of configs/general.ini,
+it can be used together with --takePictures, for example:
+
+    prj-camera-image-creator --objectsFile=objects5.dat --takePictures
+
 # Tools
 
 ## tools/genobjects.py
