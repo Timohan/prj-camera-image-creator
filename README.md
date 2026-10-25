@@ -24,6 +24,13 @@ sudo ldconfig
 
 test: pkg-config --modversion opencv4
 
+# Taking pictures without the window
+    prj-camera-image-creator --takePictures
+
+Starts the program, saves the pictures and data files of all cameras exactly like pressing 's'
+(into outputDirectory of configs/general.ini, from the objects file of objectsFile) and then exits with code 0.
+If an unknown argument is given, the program prints the usage and exits with code 1.
+
 # Tools
 
 ## tools/genobjects.py

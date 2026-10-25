@@ -1,9 +1,11 @@
 #include "mainwindow.h"
 #include <iostream>
 
-MainWindow::MainWindow(int width, int height)
+MainWindow::MainWindow(int width, int height, bool takePictures)
     : TgMainWindow(width, height, "prj-camera-image-creator"),
-    m_cameraKeyListener(this)
+    m_cameraKeyListener(this),
+    m_takePictures(takePictures),
+    m_picturesRequested(false)
 {
     m_cameraKeyListener.connectOnCameraSelected([this](int index) {
         m_baseScene.moveToCamera(index);
@@ -41,6 +43,11 @@ int MainWindow::initCustomShader()
 
 void MainWindow::customBeforeRender()
 {
+    if (m_takePictures && !m_picturesRequested) {
+        m_picturesRequested = true;
+        m_baseScene.requestSaveImages();
+        requestRender();
+    }
     if (m_baseScene.updateTurn()) {
         // renders continuously while turning, otherwise next frame waits for events
         requestRender();
@@ -50,4 +57,8 @@ void MainWindow::customBeforeRender()
 void MainWindow::customRender()
 {
     m_baseScene.customRender(getWidth(), getHeight());
+    if (m_takePictures && m_picturesRequested) {
+        // the pictures were saved by the render above
+        exit();
+    }
 }

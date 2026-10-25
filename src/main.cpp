@@ -25,11 +25,20 @@ TgApplication *getApplication()
 /*!
  * \brief main
  * \param argc
- * \param argv
+ * \param argv --takePictures saves the pictures of the cameras like the key s and exits
  * \return
  */
 int main(int argc , char *argv[])
 {
-    static MainWindow m_mainwindow(1920, 1080);
+    bool takePictures = false;
+    for (int i=1;i<argc;i++) {
+        if (strcmp(argv[i], "--takePictures") == 0) {
+            takePictures = true;
+        } else {
+            fprintf(stderr, "Unknown argument %s, usage: prj-camera-image-creator [--takePictures]\n", argv[i]);
+            return 1;
+        }
+    }
+    static MainWindow m_mainwindow(1920, 1080, takePictures);
     return m_application.exec();
 }

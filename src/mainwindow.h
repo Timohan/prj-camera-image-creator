@@ -8,7 +8,8 @@
 class MainWindow : public TgMainWindow
 {
 public:
-    MainWindow(int width, int height);
+    // takePictures: saves the pictures of the cameras at the start like the key s and exits
+    MainWindow(int width, int height, bool takePictures = false);
 
 protected:
     virtual int initCustomShader() override;
@@ -18,6 +19,8 @@ protected:
 private:
     BaseScene m_baseScene;
     CameraKeyListener m_cameraKeyListener;
+    bool m_takePictures;
+    bool m_picturesRequested;
 };
 
 #endif
