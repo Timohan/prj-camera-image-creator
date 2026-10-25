@@ -23,3 +23,24 @@ sudo make install
 sudo ldconfig
 
 test: pkg-config --modversion opencv4
+
+# Tools
+
+## tools/genobjects.py
+Generates random objects files into the objects folder. Needs only Python 3.
+
+    python3 tools/genobjects.py <first> <last>
+
+For example `python3 tools/genobjects.py 1 99` writes objects/objects1.dat ... objects/objects99.dat
+(existing files with the same names are overwritten).
+
+Every file has:
+- the cubes (sizes and textures) of objects0.dat, placed randomly around 0/0/0 at 1.5-15 m distance with random yaw, pitch and roll,
+  every cube touches the floor and can be partly under it, cubes do not overlap,
+- every cube is at least 1000 mm from the cameraObjectPosition<number> positions of configs/cameraobjects.ini,
+- every cube is visible from the position 0/1000/0 mm (at least 30% of its faces seen from there),
+- 1-3 white spot lights with random positions and directions, each lights at least 5 cubes,
+- ambient light 0.1-0.5.
+
+The result depends only on the file number, so the same number always gives the same file.
+Use a file with `objectsFile=objects1.dat` in configs/general.ini.
