@@ -14,8 +14,6 @@
 #ifndef OBJECTS_PATH
 #define OBJECTS_PATH            "objects/"
 #endif
-// objects file is OBJECTS_PATH OBJECTS_NAME ".dat", saved images start with OBJECTS_NAME
-#define OBJECTS_NAME            "objects0"
 
 #define CAMERA_FIELD_OF_VIEW    (PI_VALUE*2.0f/3.0f)
 #define MM_TO_OPENGL_UNIT       1000.0f
@@ -235,7 +233,7 @@ void BaseScene::saveCameraImages()
             renderScene(projection, view, i, distanceFrom);
         };
         const std::string filename = (std::filesystem::path(m_outputDirectory)
-                                      / (std::string(OBJECTS_NAME) + "_" + timestamp + "_" + std::to_string(i + 1))).string();
+                                      / (std::filesystem::path(m_objectsFile).stem().string() + "_" + timestamp + "_" + std::to_string(i + 1))).string();
         if (CameraImageSaver::save(m_listCameraObject[i], render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE,
                                    i + 1, filename + ".png", filename + ".dat")) {
             std::cout << "Saved " << filename << ".png and .dat" << std::endl;
@@ -269,7 +267,7 @@ void BaseScene::createObjects()
 {
     ObjectsConfig config;
 
-    const bool success = config.read(OBJECTS_PATH OBJECTS_NAME ".dat");
+    const bool success = config.read(std::string(OBJECTS_PATH) + m_objectsFile);
     // on failure ambient light is the default, so the floor is still visible
     m_ambientLight = config.getAmbientLight();
     if (!success) {
@@ -507,5 +505,6 @@ void BaseScene::setupVisualPosition()
     m_moveSpeed = config.getMoveSpeed();
     m_moveSpeedMouseWheel = config.getMoveSpeedMouseWheel();
     m_cameraObjectsFile = config.getCameraObjectsFile();
+    m_objectsFile = config.getObjectsFile();
     moveToCamera(0);
 }
