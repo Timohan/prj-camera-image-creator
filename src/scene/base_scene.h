@@ -58,6 +58,7 @@ private:
     std::string m_outputDirectory;
     std::string m_cameraObjectsFile;
     std::string m_objectsFile;
+    float m_imageOutputScale;
     bool m_saveImagesRequested;
     float m_moveSpeed;
     float m_moveSpeedMouseWheel;

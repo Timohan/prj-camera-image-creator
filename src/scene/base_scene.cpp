@@ -6,6 +6,8 @@
 #include <iostream>
 #include <filesystem>
 #include <time.h>
+#include <math.h>
+#include <algorithm>
 
 // vertical field of view, wide enough to see the floor below the camera
 #ifndef CONFIGS_PATH
@@ -35,6 +37,7 @@ BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_cameraObjectsVisible(true),
     m_cameraIndex(0),
     m_objectsFile(objectsFile),
+    m_imageOutputScale(1.0f),
     m_saveImagesRequested(false),
     m_moveSpeed(1000.0f),
     m_moveSpeedMouseWheel(1000.0f),
@@ -209,10 +212,32 @@ void BaseScene::requestSaveImages()
 }
 
 /*!
+ * \brief getScaledConfig
+ * camera with the same lens and sensor, but scale times the resolution, so the image shows the same view
+ * \param config camera
+ * \param scale imageOutputScale of general.ini
+ * \return camera of the scaled resolution
+ */
+static CameraObjectConfig getScaledConfig(const CameraObjectConfig &config, float scale)
+{
+    CameraObjectConfig scaled = config;
+    scaled.resolutionWidth = std::max(1.0f, roundf(config.resolutionWidth*scale));
+    scaled.resolutionHeight = std::max(1.0f, roundf(config.resolutionHeight*scale));
+    // rounding can change the scale a bit, principal point uses the exact scale of the resolution
+    const float scaleX = scaled.resolutionWidth/config.resolutionWidth;
+    const float scaleY = scaled.resolutionHeight/config.resolutionHeight;
+    // pixel centers are at whole numbers, so the edge of the image is at -0.5
+    scaled.principalPointX = (config.principalPointX + 0.5f)*scaleX - 0.5f;
+    scaled.principalPointY = (config.principalPointY + 0.5f)*scaleY - 0.5f;
+    return scaled;
+}
+
+/*!
  * \brief BaseScene::saveCameraImages
  * saves image of every camera object to the output directory as
  * <objects filename>_<timestamp>_<camera number>.png, camera number is 1-cameraCount as in cameraobjects.ini,
- * and distance of every pixel to <objects filename>_<timestamp>_<camera number>.dat
+ * and distance of every pixel to <objects filename>_<timestamp>_<camera number>.dat,
+ * resolution of the images is imageOutputScale times the resolution of the camera
  */
 void BaseScene::saveCameraImages()
 {
@@ -239,7 +264,9 @@ void BaseScene::saveCameraImages()
         };
         const std::string filename = (std::filesystem::path(m_outputDirectory)
                                       / (std::filesystem::path(m_objectsFile).stem().string() + "_" + timestamp + "_" + std::to_string(i + 1))).string();
-        if (CameraImageSaver::save(m_listCameraObject[i], render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE,
+        CameraObject camera;
+        camera.setup(getScaledConfig(m_listCameraObject[i].getConfig(), m_imageOutputScale), 1.0f);
+        if (CameraImageSaver::save(camera, render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE,
                                    i + 1, filename + ".png", filename + ".dat")) {
             std::cout << "Saved " << filename << ".png and .dat" << std::endl;
         }
@@ -515,5 +542,6 @@ void BaseScene::setupVisualPosition()
         m_objectsFile = config.getObjectsFile();
     }
     m_cameraObjectsVisible = config.getCamerasVisible();
+    m_imageOutputScale = config.getImageOutputScale();
     moveToCamera(0);
 }

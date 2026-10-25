@@ -19,6 +19,7 @@
  * it is read separately and it is cameraobjects.ini if it is missing.
  * objectsFile is the file of the cubes and lights in the objects folder, it is objects0.dat if it is missing.
  * camerasVisible is 1 if the cameras are drawn at the start and 0 if not, it is 1 if it is missing.
+ * imageOutputScale scales the resolution of the saved images (0.5 = half width and height), it is 1 if it is missing.
  */
 class GeneralConfig
 {
@@ -37,6 +38,7 @@ public:
     const std::string &getCameraObjectsFile() const;
     const std::string &getObjectsFile() const;
     bool getCamerasVisible() const;
+    float getImageOutputScale() const;
 
 private:
     VECTOR3 m_basePosition;     // in opengl units
@@ -49,6 +51,7 @@ private:
     std::string m_cameraObjectsFile;
     std::string m_objectsFile;
     bool m_camerasVisible;
+    float m_imageOutputScale;
 };
 
 #endif // GENERAL_CONFIG_H

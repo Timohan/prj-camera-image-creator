@@ -32,6 +32,7 @@ GeneralConfig::GeneralConfig()
     m_cameraObjectsFile = "cameraobjects.ini";
     m_objectsFile = "objects0.dat";
     m_camerasVisible = true;
+    m_imageOutputScale = 1.0f;
 }
 
 /*!
@@ -53,6 +54,7 @@ bool GeneralConfig::read(const std::string &filename)
     }
     readPositive(ini, "moveSpeed", &m_moveSpeed);
     readPositive(ini, "moveSpeedMouseWheel", &m_moveSpeedMouseWheel);
+    readPositive(ini, "imageOutputScale", &m_imageOutputScale);
     if (ini.hasKey("cameraObjectsFile")
         && (!ini.getString("cameraObjectsFile", &m_cameraObjectsFile) || m_cameraObjectsFile.empty())) {
         m_cameraObjectsFile = "cameraobjects.ini";
@@ -145,4 +147,9 @@ const std::string &GeneralConfig::getObjectsFile() const
 bool GeneralConfig::getCamerasVisible() const
 {
     return m_camerasVisible;
+}
+
+float GeneralConfig::getImageOutputScale() const
+{
+    return m_imageOutputScale;
 }
