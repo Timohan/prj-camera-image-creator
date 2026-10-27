@@ -29,6 +29,10 @@
 #define SKY_AMBIENT_RATE        2.0f
 // far plane reaches the corners of the floor
 #define CAMERA_FAR_PLANE        10000.0f
+// surface numbers of the surface pass: 0 is nothing (sky), direction lines are painted on the floor,
+// so they are the same surface, then the cubes and then the camera objects
+#define SURFACE_FLOOR           1
+#define SURFACE_FIRST_CUBE      2
 
 BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_directionLineVisible(true),
@@ -144,7 +148,7 @@ void BaseScene::customRender(float width, float height)
     viewMatrix = m_camera.getViewMatrix();
 
     // camera object does not see its own cone
-    renderScene(mvp, viewMatrix, m_cameraIndex-1, nullptr);
+    renderScene(mvp, viewMatrix, m_cameraIndex-1, nullptr, false);
     glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
 }
 
@@ -156,11 +160,15 @@ void BaseScene::customRender(float width, float height)
  * \param hiddenCameraObject index of the camera object that is not rendered, -1 renders all
  * \param distanceFrom if not nullptr, renders distance from this position to every pixel instead
  * of the colors (float framebuffer is needed), sky is not rendered
+ * \param surfacePass with distanceFrom: renders the normal toward distanceFrom (rgb) and the surface number
+ * (alpha) of every pixel instead of the distance, surface number is SURFACE_FLOOR for the floor and the direction
+ * lines, SURFACE_FIRST_CUBE + index for the cubes and then the camera objects
  */
 void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject,
-                            const VECTOR3 *distanceFrom)
+                            const VECTOR3 *distanceFrom, bool surfacePass)
 {
     const int tranformPosition = glGetUniformLocation(m_shader.generalShader(), "transformPosition");
+    const int surfaceId = glGetUniformLocation(m_shader.generalShader(), "surfaceId");
 
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "projection"), 1, GL_FALSE,  projection.m );
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "view"), 1, GL_FALSE, view.m );
@@ -168,7 +176,8 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
     glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthRadius"), EARTH_RADIUS);
     setupLight();
     m_shadowMap.setupShader(m_shader.generalShader());
-    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "distancePass"), distanceFrom ? 1.0f : 0.0f);
+    glUniform1f(glGetUniformLocation(m_shader.generalShader(), "distancePass"),
+                distanceFrom ? (surfacePass ? 2.0f : 1.0f) : 0.0f);
     if (distanceFrom) {
         glUniform3f(glGetUniformLocation(m_shader.generalShader(), "distanceFrom"), distanceFrom->x, distanceFrom->y, distanceFrom->z);
     }
@@ -185,11 +194,13 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
         glUniform1f(glGetUniformLocation(m_shader.generalShader(), "sky"), 0.0f);
     }
     glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 1.0f);
+    glUniform1f(surfaceId, SURFACE_FLOOR);
     m_floor.render();
     if (m_directionLineVisible) {
         m_directionLine.render();
     }
     for (int i=0;i<m_cubeCount;i++) {
+        glUniform1f(surfaceId, static_cast<float>(SURFACE_FIRST_CUBE + i));
         m_listCube[i].render();
     }
     if (m_cameraObjectsVisible) {
@@ -197,6 +208,7 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
         glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 0.0f);
         for (int i=0;i<m_cameraCount;i++) {
             if (i != hiddenCameraObject) {
+                glUniform1f(surfaceId, static_cast<float>(SURFACE_FIRST_CUBE + m_cubeCount + i));
                 m_listCameraObject[i].render();
             }
         }
@@ -244,8 +256,9 @@ void BaseScene::saveCameraImages()
     // smaller images are rendered larger and shrunk, but never larger than the resolution of the camera
     const int supersampling = std::max(1, std::min(MAX_SUPERSAMPLING, static_cast<int>(floorf(1.0f/m_imageOutputScale + 0.0001f))));
     for (int i=0;i<m_cameraCount;i++) {
-        auto render = [this, i](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 *distanceFrom) {
-            renderScene(projection, view, i, distanceFrom);
+        auto render = [this, i](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 *distanceFrom,
+                                bool surfacePass) {
+            renderScene(projection, view, i, distanceFrom, surfacePass);
         };
         const std::string filename = (std::filesystem::path(m_outputDirectory)
                                       / (std::filesystem::path(m_objectsFile).stem().string() + "_" + timestamp + "_" + std::to_string(i + 1))).string();

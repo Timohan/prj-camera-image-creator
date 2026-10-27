@@ -74,7 +74,7 @@ private:
     void setupLight();
     int createShadowMap();
     void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject,
-                     const VECTOR3 *distanceFrom);
+                     const VECTOR3 *distanceFrom, bool surfacePass);
     void saveCameraImages();
     void startTurnFromCurrent();
     void setTurnDirection(int *turnDirection, int direction);

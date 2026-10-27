@@ -69,7 +69,9 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
  *
  * fragment shader, ambient light and up to CAMERA_SHADER_MAX_SPOT_LIGHTS spot lights with shadows,
  * when sky is 1.0 spot lights are not used and the light is ambientLight*skyAmbientRate,
- * when distancePass is 1.0 red is the distance from distanceFrom to the pixel (float framebuffer).
+ * when distancePass is 1.0 red is the distance from distanceFrom to the pixel (float framebuffer),
+ * when distancePass is 2.0 (surface pass) rgb is the normal of the surface turned toward distanceFrom
+ * and alpha is surfaceId, the number of the object (float framebuffer).
  * Shadow of the spot light: the pixel is moved toward its normal by SHADOW_NORMAL_OFFSET texels of the
  * shadow map (no shadow acne), it is projected to the tile of the light in the shadow map and
  * compared with 3x3 linear filtered samples (soft edge).
@@ -95,6 +97,7 @@ const char *CameraShader::m_fragShader = "" \
         "uniform float skyAmbientRate;" \
         "uniform float distancePass;" \
         "uniform vec3 distanceFrom;" \
+        "uniform float surfaceId;" \
         "varying vec3 worldPosition;" \
         "varying vec3 worldNormal;" \
         "varying vec2 texCoord;" \
@@ -145,7 +148,9 @@ const char *CameraShader::m_fragShader = "" \
         "       }" \
         "       vec4 color    = texture2D(texture, texCoord)*colorLight;" \
         "       gl_FragColor  = vec4(color.rgb*light, color.a);" \
-        "       if (distancePass > 0.5) {" \
+        "       if (distancePass > 1.5) {" \
+        "           gl_FragColor = vec4(dot(normal, worldPosition - distanceFrom) > 0.0 ? -normal : normal, surfaceId);" \
+        "       } else if (distancePass > 0.5) {" \
         "           gl_FragColor = vec4(length(worldPosition - distanceFrom), 0.0, 0.0, 1.0);" \
         "       }" \
         "}";
