@@ -67,8 +67,9 @@ Testing/
 .cache/
 prj-camera-image-creator
 
-# random scenes 100-999 of tools/genobjects.py, they can be created again with: python3 tools/genobjects.py 100 999
+# random scenes 100-9999 of tools/genobjects.py, they can be created again with: python3 tools/genobjects.py 100 9999
 objects/objects[1-9][0-9][0-9].dat
+objects/objects[1-9][0-9][0-9][0-9].dat
 
 # personal Claude Code settings
 .claude/settings.local.json
