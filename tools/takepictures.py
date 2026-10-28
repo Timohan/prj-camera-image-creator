@@ -97,7 +97,7 @@ class PictureTaker:
             self.stop('%s failed: %s' % (objects_file, error))
 
     def run_program(self, objects_file):
-        command = [PROGRAM, '--takePictures', '--camerasVisible=0', '--objectsFile=' + objects_file]
+        command = [PROGRAM, '--takePictures', '--silent', '--camerasVisible=0', '--objectsFile=' + objects_file]
         with self.lock:
             if self.stopped:
                 return
