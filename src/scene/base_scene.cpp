@@ -13,9 +13,6 @@
 #ifndef CONFIGS_PATH
 #define CONFIGS_PATH            "configs/"
 #endif
-#ifndef OBJECTS_PATH
-#define OBJECTS_PATH            "objects/"
-#endif
 
 // saved images are rendered at most this many times larger in width and height and shrunk
 #define MAX_SUPERSAMPLING       4
@@ -297,7 +294,8 @@ void BaseScene::createObjects()
 {
     ObjectsConfig config;
 
-    const bool success = config.read(std::string(OBJECTS_PATH) + m_objectsFile);
+    const bool success = !m_objectsDirectory.empty()
+                         && config.read((std::filesystem::path(m_objectsDirectory)/m_objectsFile).string());
     // on failure ambient light is the default, so the floor is still visible
     m_ambientLight = config.getAmbientLight();
     if (!success) {
@@ -532,6 +530,7 @@ void BaseScene::setupVisualPosition()
     m_baseDirection = config.getBaseDirection();
     m_directionLine.setup(config.getDirectionLineWidth(), config.getDirectionLineHeight());
     m_outputDirectory = config.getOutputDirectory();
+    m_objectsDirectory = config.getObjectsDirectory();
     m_moveSpeed = config.getMoveSpeed();
     m_moveSpeedMouseWheel = config.getMoveSpeedMouseWheel();
     m_cameraObjectsFile = config.getCameraObjectsFile();

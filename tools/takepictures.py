@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Takes the pictures of every objects/*.dat file into outputDirectory of configs/general.ini:
+"""Takes the pictures of every .dat file of objectsDirectory into outputDirectory of configs/general.ini:
 usage takepictures.py [--t<number of threads>], for example --t10 runs 10 programs at the same time, default is 1.
 Previous files of outputDirectory are moved to /tmp/image-creator-<timestamp> first. If all pictures are created,
 the previous files are removed, if any objects file fails, the new files are removed and the previous files are
@@ -11,16 +11,15 @@ from concurrent.futures import ThreadPoolExecutor
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROGRAM = os.path.join(REPO, 'prj-camera-image-creator')
 GENERAL_INI = os.path.join(REPO, 'configs', 'general.ini')
-OBJECTS_DIRECTORY = os.path.join(REPO, 'objects')
 BACKUP_PREFIX = '/tmp/image-creator-'
 
 
-def read_output_directory():
-    """outputDirectory of general.ini, relative path is relative to the repository like for the program"""
+def read_directory(key):
+    """directory of the key of general.ini, relative path is relative to the repository like for the program"""
     for line in open(GENERAL_INI):
         line = line.strip()
-        if line.startswith('outputDirectory='):
-            directory = line[len('outputDirectory='):].strip()
+        if line.startswith(key + '='):
+            directory = line[len(key) + 1:].strip()
             if directory:
                 return os.path.abspath(os.path.join(REPO, os.path.expanduser(directory)))
     return None
@@ -36,10 +35,10 @@ def check_output_directory(directory):
     return True
 
 
-def find_objects_files():
+def find_objects_files(objects_directory):
     """objects files sorted by the number, objects2.dat before objects10.dat"""
-    names = [name for name in os.listdir(OBJECTS_DIRECTORY)
-             if name.endswith('.dat') and os.path.isfile(os.path.join(OBJECTS_DIRECTORY, name))]
+    names = [name for name in os.listdir(objects_directory)
+             if name.endswith('.dat') and os.path.isfile(os.path.join(objects_directory, name))]
     return sorted(names, key=lambda name: [int(part) if part.isdigit() else part for part in re.split(r'(\d+)', name)])
 
 
@@ -143,7 +142,7 @@ def main():
     if threads is None:
         print('usage: takepictures.py [--t<number of threads>], for example --t10')
         return 1
-    output_directory = read_output_directory()
+    output_directory = read_directory('outputDirectory')
     if not output_directory:
         print('Error: outputDirectory is not set in %s' % GENERAL_INI)
         return 1
@@ -153,9 +152,13 @@ def main():
     if not os.access(PROGRAM, os.X_OK):
         print('Error: %s is missing, build it with make' % PROGRAM)
         return 1
-    objects_files = find_objects_files()
+    objects_directory = read_directory('objectsDirectory')
+    if not objects_directory or not os.path.isdir(objects_directory):
+        print('Error: objectsDirectory of %s is missing or it is not a directory' % GENERAL_INI)
+        return 1
+    objects_files = find_objects_files(objects_directory)
     if not objects_files:
-        print('Error: no .dat files in %s' % OBJECTS_DIRECTORY)
+        print('Error: no .dat files in %s' % objects_directory)
         return 1
 
     os.makedirs(output_directory, exist_ok=True)

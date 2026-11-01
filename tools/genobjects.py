@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generates objects/objects<first>.dat ... objects/objects<last>.dat: usage genobjects.py <first> <last>
+"""Generates objects<first>.dat ... objects<last>.dat into objectsDirectory of configs/general.ini:
+usage genobjects.py <first> <last>
 Cubes of objects0.dat are placed randomly, 1-3 random spot lights, random ambient light."""
 import math, random, re, sys
 
@@ -161,9 +162,20 @@ def read_camera_positions():
     return positions
 
 
-def read_base_cubes():
+def read_objects_directory():
+    """objectsDirectory of general.ini, relative path is relative to the repository like for the program"""
+    for line in open(REPO + '/configs/general.ini'):
+        line = line.strip()
+        if line.startswith('objectsDirectory='):
+            directory = line[len('objectsDirectory='):].strip()
+            if directory:
+                return os.path.abspath(os.path.join(REPO, os.path.expanduser(directory)))
+    sys.exit('Error: objectsDirectory is missing in configs/general.ini')
+
+
+def read_base_cubes(objects_directory):
     cubes = []
-    for line in open(REPO + '/objects/objects0.dat'):
+    for line in open(os.path.join(objects_directory, 'objects0.dat')):
         if line.startswith('Cube='):
             v = line[5:].strip().split('/')
             cubes.append((tuple(float(x) for x in v[3:6]), v[9]))
@@ -260,9 +272,10 @@ def generate(number, cameras, base):
 
 
 if __name__ == '__main__':
+    objects_directory = read_objects_directory()
     cameras = read_camera_positions()
-    base = read_base_cubes()
+    base = read_base_cubes(objects_directory)
     first, last = int(sys.argv[1]), int(sys.argv[2])
     for n in range(first, last + 1):
-        open('%s/objects/objects%d.dat' % (REPO, n), 'w').write(generate(n, cameras, base))
+        open(os.path.join(objects_directory, 'objects%d.dat' % n), 'w').write(generate(n, cameras, base))
         print('objects%d.dat' % n, flush=True)

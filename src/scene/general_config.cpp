@@ -52,6 +52,9 @@ bool GeneralConfig::read(const std::string &filename)
     if (!ini.getString("outputDirectory", &m_outputDirectory) || m_outputDirectory.empty()) {
         std::cerr << filename << ": outputDirectory is missing, camera images cannot be saved" << std::endl;
     }
+    if (!ini.getString("objectsDirectory", &m_objectsDirectory) || m_objectsDirectory.empty()) {
+        std::cerr << filename << ": objectsDirectory is missing, objects cannot be read" << std::endl;
+    }
     readPositive(ini, "moveSpeed", &m_moveSpeed);
     readPositive(ini, "moveSpeedMouseWheel", &m_moveSpeedMouseWheel);
     readPositive(ini, "imageOutputScale", &m_imageOutputScale);
@@ -122,6 +125,11 @@ float GeneralConfig::getDirectionLineHeight() const
 const std::string &GeneralConfig::getOutputDirectory() const
 {
     return m_outputDirectory;
+}
+
+const std::string &GeneralConfig::getObjectsDirectory() const
+{
+    return m_objectsDirectory;
 }
 
 float GeneralConfig::getMoveSpeed() const

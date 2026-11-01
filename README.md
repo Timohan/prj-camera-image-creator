@@ -38,7 +38,8 @@ Does the same without showing the window, --silent can be used only together wit
 # Selecting the objects file
     prj-camera-image-creator --objectsFile=objects1.dat
 
-Uses the given file of the objects folder instead of objectsFile of configs/general.ini,
+Uses the given file of objectsDirectory of configs/general.ini (/home/timo/camera_original_objects) instead of
+objectsFile of configs/general.ini,
 it can be used together with --takePictures, for example:
 
     prj-camera-image-creator --objectsFile=objects5.dat --takePictures
@@ -52,7 +53,7 @@ of configs/general.ini, key 'c' still toggles them.
 # Tools
 
 ## tools/takepictures.py
-Takes the pictures of every .dat file of the objects folder (like `--takePictures --silent --camerasVisible=0 --objectsFile=<file>`)
+Takes the pictures of every .dat file of objectsDirectory of configs/general.ini (like `--takePictures --silent --camerasVisible=0 --objectsFile=<file>`)
 into outputDirectory of configs/general.ini, the windows are not shown. Build the program first with make.
 
     python3 tools/takepictures.py [--t<number of threads>]
@@ -67,11 +68,11 @@ If even one objects file fails, the script stops, prints which file failed, remo
 and moves the previous files back to outputDirectory.
 
 ## tools/genobjects.py
-Generates random objects files into the objects folder. Needs only Python 3.
+Generates random objects files into objectsDirectory of configs/general.ini. Needs only Python 3.
 
     python3 tools/genobjects.py <first> <last>
 
-For example `python3 tools/genobjects.py 1 99` writes objects/objects1.dat ... objects/objects99.dat
+For example `python3 tools/genobjects.py 1 99` writes objects1.dat ... objects99.dat of objectsDirectory
 (existing files with the same names are overwritten).
 
 Every file has:

@@ -17,7 +17,8 @@
  * they are read separately and they are 1000 if they are missing.
  * cameraObjectsFile is the file of the camera objects in the configs folder,
  * it is read separately and it is cameraobjects.ini if it is missing.
- * objectsFile is the file of the cubes and lights in the objects folder, it is objects0.dat if it is missing.
+ * objectsDirectory is the directory of the objects files, it is read separately and it is empty if it is missing.
+ * objectsFile is the file of the cubes and lights in objectsDirectory, it is objects0.dat if it is missing.
  * camerasVisible is 1 if the cameras are drawn at the start and 0 if not, it is 1 if it is missing.
  * imageOutputScale scales the resolution of the saved images (0.5 = half width and height), it is 1 if it is missing.
  */
@@ -36,6 +37,7 @@ public:
     float getMoveSpeed() const;
     float getMoveSpeedMouseWheel() const;
     const std::string &getCameraObjectsFile() const;
+    const std::string &getObjectsDirectory() const;
     const std::string &getObjectsFile() const;
     bool getCamerasVisible() const;
     float getImageOutputScale() const;
@@ -49,6 +51,7 @@ private:
     float m_moveSpeed;              // milliseconds
     float m_moveSpeedMouseWheel;    // mm
     std::string m_cameraObjectsFile;
+    std::string m_objectsDirectory;
     std::string m_objectsFile;
     bool m_camerasVisible;
     float m_imageOutputScale;

@@ -22,7 +22,6 @@ LDFLAGS:=$(PKGFLAGS) -lGL -lGLEW -lglfw
 CURRENT_DIR=$(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 CXXFLAGS+=-DIMAGES_PATH=\"$(CURRENT_DIR)images/\"
 CXXFLAGS+=-DCONFIGS_PATH=\"$(CURRENT_DIR)configs/\"
-CXXFLAGS+=-DOBJECTS_PATH=\"$(CURRENT_DIR)objects/\"
 
 src_SRCDIR:=$(CURRENT_DIR)src
 src_SRCS:=$(wildcard $(src_SRCDIR)/*.cpp)
