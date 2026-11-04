@@ -50,6 +50,12 @@ it can be used together with --takePictures, for example:
 --camerasVisible=0 hides and --camerasVisible=1 shows the cameras at the start, instead of camerasVisible
 of configs/general.ini, key 'c' still toggles them.
 
+# Showing what the cameras cannot see
+Key 'h' shows every surface (floor, cubes, camera objects) and the sky that none of the cameras can see as black,
+pressing 'h' again shows them normally. A camera sees a pixel if its lens puts it inside the saved image
+(resolution of imageOutputScale, distortion and field of view of cameraObjectsFile) and no nearer surface is
+in front of it. Saved pictures are not changed by 'h'.
+
 # Tools
 
 ## tools/takepictures.py

@@ -36,6 +36,8 @@ BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_listCube(nullptr),
     m_cubeCount(0),
     m_ambientLight({ 0.0f, 0.0f, 0.0f }),
+    m_hideUnseen(false),
+    m_visibilityMapChanged(true),
     m_listCameraObject(nullptr),
     m_cameraCount(0),
     m_cameraObjectsVisible(true),
@@ -144,9 +146,36 @@ void BaseScene::customRender(float width, float height)
     }
     viewMatrix = m_camera.getViewMatrix();
 
+    if (m_hideUnseen && m_visibilityMapChanged) {
+        createVisibilityMap();
+    }
+    m_visibilityMap.setupShader(m_shader.generalShader(), m_hideUnseen);
     // camera object does not see its own cone
     renderScene(mvp, viewMatrix, m_cameraIndex-1, nullptr, false);
+    // saved images and the maps are rendered without the visibility
+    m_visibilityMap.setupShader(m_shader.generalShader(), false);
+    m_visibilityMap.unbind();
     glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
+}
+
+/*!
+ * \brief BaseScene::createVisibilityMap
+ * renders the distance maps of the camera objects like their saved images see the scene: in the resolution of
+ * the saved images, without their own cone and with the camera objects and the direction line if they are visible
+ */
+void BaseScene::createVisibilityMap()
+{
+    std::vector<CameraObjectConfig> listCamera;
+    for (int i=0;i<m_cameraCount;i++) {
+        listCamera.push_back(CameraImageSaver::getScaledConfig(m_listCameraObject[i].getConfig(), m_imageOutputScale));
+    }
+    auto render = [this](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 &cameraPosition, int cameraIndex) {
+        renderScene(projection, view, cameraIndex, &cameraPosition, false);
+    };
+    if (m_visibilityMap.create(listCamera, render) != 0) {
+        std::cerr << "Visibility of the cameras cannot be shown" << std::endl;
+    }
+    m_visibilityMapChanged = false;
 }
 
 /*!
@@ -509,6 +538,7 @@ void BaseScene::startTurnFromCurrent()
 void BaseScene::toggleDirectionLine()
 {
     m_directionLineVisible = !m_directionLineVisible;
+    m_visibilityMapChanged = true;
 }
 
 /*!
@@ -518,6 +548,16 @@ void BaseScene::toggleDirectionLine()
 void BaseScene::toggleCameraObjects()
 {
     m_cameraObjectsVisible = !m_cameraObjectsVisible;
+    m_visibilityMapChanged = true;
+}
+
+/*!
+ * \brief BaseScene::toggleHideUnseen
+ * shows the pixels that no camera object sees (surfaces and sky) as black, or shows them normally
+ */
+void BaseScene::toggleHideUnseen()
+{
+    m_hideUnseen = !m_hideUnseen;
 }
 
 void BaseScene::setupVisualPosition()

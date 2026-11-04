@@ -17,6 +17,8 @@
 
 // maximum count of spot lights in the shader
 #define CAMERA_SHADER_MAX_SPOT_LIGHTS   8
+// maximum count of camera objects of the visibility (VisibilityMap)
+#define CAMERA_SHADER_MAX_VISIBILITY_CAMERAS    8
 
 enum ShaderAttributes3d
 {

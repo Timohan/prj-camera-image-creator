@@ -20,6 +20,9 @@ MainWindow::MainWindow(int width, int height, bool takePictures, const std::stri
     m_cameraKeyListener.connectOnSaveImages([this]() {
         m_baseScene.requestSaveImages();
     });
+    m_cameraKeyListener.connectOnToggleHideUnseen([this]() {
+        m_baseScene.toggleHideUnseen();
+    });
     m_cameraKeyListener.connectOnTurnStart([this](int direction) {
         m_baseScene.startTurn(direction);
     });

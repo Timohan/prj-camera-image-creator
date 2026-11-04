@@ -10,6 +10,7 @@
  * and keys 1-6 select the camera objects (index 1-6 = camera object 0-5).
  * Key l toggles the direction line and key c toggles the camera object cones.
  * Key s saves the images of the camera objects.
+ * Key h toggles the black color of the surfaces and the sky that no camera object sees.
  * Left and right arrow keys turn the camera while they are down
  * (direction -1 is left and 1 is right), up and down arrow keys turn
  * the camera up or down (direction -1 is down and 1 is up).
@@ -26,6 +27,7 @@ public:
     void connectOnToggleDirectionLine(std::function<void()> toggleDirectionLine);
     void connectOnToggleCameraObjects(std::function<void()> toggleCameraObjects);
     void connectOnSaveImages(std::function<void()> saveImages);
+    void connectOnToggleHideUnseen(std::function<void()> toggleHideUnseen);
     void connectOnTurnStart(std::function<void(int direction)> turnStart);
     void connectOnTurnStop(std::function<void(int direction)> turnStop);
     void connectOnPitchStart(std::function<void(int direction)> pitchStart);
@@ -40,6 +42,7 @@ private:
     std::function<void()> m_toggleDirectionLine;
     std::function<void()> m_toggleCameraObjects;
     std::function<void()> m_saveImages;
+    std::function<void()> m_toggleHideUnseen;
     std::function<void(int direction)> m_turnStart;
     std::function<void(int direction)> m_turnStop;
     std::function<void(int direction)> m_pitchStart;

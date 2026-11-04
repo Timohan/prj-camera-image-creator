@@ -28,6 +28,13 @@ public:
     static bool save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar, int supersampling,
                      int cameraNumber, const std::string &imageFilename, const std::string &dataFilename);
     static CameraObjectConfig getScaledConfig(const CameraObjectConfig &config, float scale);
+    // the part of the view of the camera that has pixels in its saved image
+    struct LensLimits {
+        float area[4];          // pinhole: left, top, right and bottom edge of the rendered undistorted area in pixels
+        float maxRadius2;       // pinhole: largest (x/z)^2 + (y/z)^2 of the pixels, larger values are outside of the image
+        float maxTheta;         // fisheye: largest angle from the direction of the camera of the pixels (radians)
+    };
+    static LensLimits getLensLimits(const CameraObjectConfig &config);
 
 private:
     static bool createPinholeImage(const CameraObject &camera, const RenderFunction &render,

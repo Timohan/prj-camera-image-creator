@@ -25,6 +25,11 @@ void CameraKeyListener::connectOnSaveImages(std::function<void()> saveImages)
     m_saveImages = saveImages;
 }
 
+void CameraKeyListener::connectOnToggleHideUnseen(std::function<void()> toggleHideUnseen)
+{
+    m_toggleHideUnseen = toggleHideUnseen;
+}
+
 void CameraKeyListener::connectOnTurnStart(std::function<void(int direction)> turnStart)
 {
     m_turnStart = turnStart;
@@ -111,6 +116,14 @@ TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWin
         && eventData->m_event.m_keyEvent.m_key == 's') {
         if (m_saveImages) {
             m_saveImages();
+        }
+        return TgEventResult::EventResultCompleted;
+    }
+    if (eventData->m_type == TgEventType::EventTypeCharacterCallback
+        && eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_NormalKey
+        && eventData->m_event.m_keyEvent.m_key == 'h') {
+        if (m_toggleHideUnseen) {
+            m_toggleHideUnseen();
         }
         return TgEventResult::EventResultCompleted;
     }

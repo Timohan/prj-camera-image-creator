@@ -75,10 +75,18 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
  * Shadow of the spot light: the pixel is moved toward its normal by SHADOW_NORMAL_OFFSET texels of the
  * shadow map (no shadow acne), it is projected to the tile of the light in the shadow map and
  * compared with 3x3 linear filtered samples (soft edge).
+ * When hideUnseen is 1.0, pixels that no camera object sees are black (VisibilityMap): a camera sees the pixel
+ * if the lens of the camera puts it inside the saved image and the distance map of the camera has no nearer
+ * surface in its direction, the pixel is moved toward its normal by VISIBILITY_NORMAL_OFFSET texels like
+ * in the shadow (far away the moved pixel can be above the horizon, where nothing hides it).
+ * Sky is seen if the distance map has no surface in its direction.
  */
 const char *CameraShader::m_fragShader = "" \
         "#define MAX_SPOT_LIGHTS " SHADER_VALUE(CAMERA_SHADER_MAX_SPOT_LIGHTS) "\n" \
         "#define SHADOW_NORMAL_OFFSET 1.5\n" \
+        "#define MAX_VISIBILITY_CAMERAS " SHADER_VALUE(CAMERA_SHADER_MAX_VISIBILITY_CAMERAS) "\n" \
+        "#define VISIBILITY_NORMAL_OFFSET 2.0\n" \
+        "#define VISIBILITY_DISTANCE_TOLERANCE 2.0\n" \
         "uniform sampler2D texture;" \
         "uniform sampler2DShadow shadowMap;" \
         "uniform vec2 shadowMapTexelSize;" \
@@ -98,6 +106,27 @@ const char *CameraShader::m_fragShader = "" \
         "uniform float distancePass;" \
         "uniform vec3 distanceFrom;" \
         "uniform float surfaceId;" \
+        "uniform float hideUnseen;" \
+        "uniform int visibilityCameraCount;" \
+        "uniform float visibilityTanHalf;" \
+        "uniform float visibilityTexelAngle;" \
+        "uniform vec3 visibilityPosition[MAX_VISIBILITY_CAMERAS];" \
+        "uniform vec3 visibilityRight[MAX_VISIBILITY_CAMERAS];" \
+        "uniform vec3 visibilityUp[MAX_VISIBILITY_CAMERAS];" \
+        "uniform vec3 visibilityForward[MAX_VISIBILITY_CAMERAS];" \
+        "uniform vec4 visibilityLens[MAX_VISIBILITY_CAMERAS];" \
+        "uniform vec4 visibilitySize[MAX_VISIBILITY_CAMERAS];" \
+        "uniform vec4 visibilityDistortionA[MAX_VISIBILITY_CAMERAS];" \
+        "uniform vec4 visibilityDistortionB[MAX_VISIBILITY_CAMERAS];" \
+        "uniform vec4 visibilityArea[MAX_VISIBILITY_CAMERAS];" \
+        "uniform sampler2D visibilityMap0;" \
+        "uniform sampler2D visibilityMap1;" \
+        "uniform sampler2D visibilityMap2;" \
+        "uniform sampler2D visibilityMap3;" \
+        "uniform sampler2D visibilityMap4;" \
+        "uniform sampler2D visibilityMap5;" \
+        "uniform sampler2D visibilityMap6;" \
+        "uniform sampler2D visibilityMap7;" \
         "varying vec3 worldPosition;" \
         "varying vec3 worldNormal;" \
         "varying vec2 texCoord;" \
@@ -128,6 +157,93 @@ const char *CameraShader::m_fragShader = "" \
         "       }" \
         "       return lit/9.0;" \
         "}" \
+        "bool insideImage(int i, vec3 ray)" \
+        "{" \
+        "       float x       = dot(ray, visibilityRight[i]);" \
+        "       float y       = -dot(ray, visibilityUp[i]);" \
+        "       float z       = dot(ray, visibilityForward[i]);" \
+        "       vec4 lens     = visibilityLens[i];" \
+        "       vec4 size     = visibilitySize[i];" \
+        "       vec4 a        = visibilityDistortionA[i];" \
+        "       vec4 b        = visibilityDistortionB[i];" \
+        "       vec2 pixel;" \
+        "       if (size.z > 0.5) {" \
+        "           float r       = length(vec2(x, y));" \
+        "           float theta   = atan(r, z);" \
+        "           if (theta > size.w) {" \
+        "               return false;" \
+        "           }" \
+        "           float t2      = theta*theta;" \
+        "           float thetaD  = theta*(1.0 + t2*(a.x + t2*(a.y + t2*(a.z + t2*a.w))));" \
+        "           pixel         = r > 0.0 ? vec2(x, y)/r*thetaD : vec2(0.0);" \
+        "       } else {" \
+        "           if (z <= 0.0) {" \
+        "               return false;" \
+        "           }" \
+        "           vec2 n        = vec2(x, y)/z;" \
+        "           float r2      = dot(n, n);" \
+        "           if (r2 > size.w) {" \
+        "               return false;" \
+        "           }" \
+        "           vec2 undistorted = n*lens.xy + lens.zw;" \
+        "           vec4 area     = visibilityArea[i];" \
+        "           if (undistorted.x < area.x || undistorted.y < area.y || undistorted.x >= area.z || undistorted.y >= area.w) {" \
+        "               return false;" \
+        "           }" \
+        "           float radial  = (1.0 + r2*(a.x + r2*(a.y + r2*b.x)))/(1.0 + r2*(b.y + r2*(b.z + r2*b.w)));" \
+        "           pixel         = vec2(n.x*radial + 2.0*a.z*n.x*n.y + a.w*(r2 + 2.0*n.x*n.x)," \
+        "                                n.y*radial + a.z*(r2 + 2.0*n.y*n.y) + 2.0*a.w*n.x*n.y);" \
+        "       }" \
+        "       pixel         = pixel*lens.xy + lens.zw;" \
+        "       return pixel.x >= -0.5 && pixel.y >= -0.5 && pixel.x < size.x - 0.5 && pixel.y < size.y - 0.5;" \
+        "}" \
+        "float getVisibilityDistance(int i, sampler2D map, vec3 ray)" \
+        "{" \
+        "       float x       = dot(ray, visibilityRight[i]);" \
+        "       float u       = dot(ray, visibilityUp[i]);" \
+        "       float z       = dot(ray, visibilityForward[i]);" \
+        "       vec3 axis     = abs(vec3(x, u, z));" \
+        "       float face;" \
+        "       vec2 xy;" \
+        "       if (axis.z >= axis.x && axis.z >= axis.y) {" \
+        "           face          = z > 0.0 ? 0.0 : 3.0;" \
+        "           xy            = vec2(x/z, u/abs(z));" \
+        "       } else if (axis.x >= axis.y) {" \
+        "           face          = x > 0.0 ? 1.0 : 2.0;" \
+        "           xy            = vec2(-z/x, u/abs(x));" \
+        "       } else {" \
+        "           face          = u > 0.0 ? 4.0 : 5.0;" \
+        "           xy            = vec2(x/abs(u), -z/u);" \
+        "       }" \
+        "       vec2 st       = (xy/visibilityTanHalf + 1.0)*0.5;" \
+        "       return texture2D(map, vec2((face + st.x)/6.0, st.y)).r;" \
+        "}" \
+        "bool seenBy(int i, sampler2D map, vec3 normal)" \
+        "{" \
+        "       vec3 toPixel  = worldPosition - visibilityPosition[i];" \
+        "       if (!insideImage(i, toPixel)) {" \
+        "           return false;" \
+        "       }" \
+        "       if (sky > 0.5) {" \
+        "           return getVisibilityDistance(i, map, toPixel) < 0.0;" \
+        "       }" \
+        "       float pixelDistance = length(toPixel);" \
+        "       vec3 toward   = dot(normal, toPixel) > 0.0 ? -normal : normal;" \
+        "       vec3 moved    = toPixel + toward*pixelDistance*visibilityTexelAngle*VISIBILITY_NORMAL_OFFSET;" \
+        "       float nearest = getVisibilityDistance(i, map, moved);" \
+        "       return nearest < 0.0 || length(moved) <= nearest + pixelDistance*visibilityTexelAngle*VISIBILITY_DISTANCE_TOLERANCE;" \
+        "}" \
+        "bool seenByAnyCamera(vec3 normal)" \
+        "{" \
+        "       return (visibilityCameraCount > 0 && seenBy(0, visibilityMap0, normal))" \
+        "           || (visibilityCameraCount > 1 && seenBy(1, visibilityMap1, normal))" \
+        "           || (visibilityCameraCount > 2 && seenBy(2, visibilityMap2, normal))" \
+        "           || (visibilityCameraCount > 3 && seenBy(3, visibilityMap3, normal))" \
+        "           || (visibilityCameraCount > 4 && seenBy(4, visibilityMap4, normal))" \
+        "           || (visibilityCameraCount > 5 && seenBy(5, visibilityMap5, normal))" \
+        "           || (visibilityCameraCount > 6 && seenBy(6, visibilityMap6, normal))" \
+        "           || (visibilityCameraCount > 7 && seenBy(7, visibilityMap7, normal));" \
+        "}" \
         "void main()" \
         "{" \
         "       vec3 normal   = normalize(worldNormal);" \
@@ -152,6 +268,9 @@ const char *CameraShader::m_fragShader = "" \
         "           gl_FragColor = vec4(dot(normal, worldPosition - distanceFrom) > 0.0 ? -normal : normal, surfaceId);" \
         "       } else if (distancePass > 0.5) {" \
         "           gl_FragColor = vec4(length(worldPosition - distanceFrom), 0.0, 0.0, 1.0);" \
+        "       }" \
+        "       if (hideUnseen > 0.5 && distancePass < 0.5 && !seenByAnyCamera(normal)) {" \
+        "           gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);" \
         "       }" \
         "}";
 /*!

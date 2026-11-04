@@ -10,6 +10,7 @@
 #include "cameraobject.h"
 #include "objects_config.h"
 #include "shadow_map.h"
+#include "visibility_map.h"
 #include <chrono>
 #include <string>
 #include <vector>
@@ -29,6 +30,7 @@ public:
     void moveToCamera(int index);
     void toggleDirectionLine();
     void toggleCameraObjects();
+    void toggleHideUnseen();
     void requestSaveImages();
     void startTurn(int direction);
     void stopTurn(int direction);
@@ -51,6 +53,9 @@ private:
     std::vector<SpotLightConfig> m_listSpotLight;
     VECTOR3 m_ambientLight;
     ShadowMap m_shadowMap;
+    VisibilityMap m_visibilityMap;
+    bool m_hideUnseen;                  // pixels that no camera object sees are black
+    bool m_visibilityMapChanged;        // visibility map must be rendered again before it is used
     CameraObject *m_listCameraObject;
     int m_cameraCount;
     bool m_cameraObjectsVisible;
@@ -74,6 +79,7 @@ private:
     void createObjects();
     void setupLight();
     int createShadowMap();
+    void createVisibilityMap();
     void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject,
                      const VECTOR3 *distanceFrom, bool surfacePass);
     void saveCameraImages();

@@ -32,6 +32,10 @@
 // cube face sees this many pixels more on every side than 90 degrees
 #define FISHEYE_FACE_MARGIN_PIXELS  2.0f
 #define FISHEYE_NEWTON_ITERATIONS   20
+// steps of the angle 0-180 degrees when the largest angle of the fisheye is searched
+#define FISHEYE_LIMIT_STEPS         3600
+// largest undistorted radius of the image corners is multiplied by this, so the corner pixels are inside of it
+#define LENS_LIMIT_MARGIN           1.0001f
 // average distance from the earth to the sun in mm, distance of the sky
 #define EARTH_ORBIT_DISTANCE_MM     149597870700000.0
 // distance map values that are not distances
@@ -63,6 +67,81 @@ CameraObjectConfig CameraImageSaver::getScaledConfig(const CameraObjectConfig &c
     scaled.principalPointX = (config.principalPointX + 0.5f)*scaleX - 0.5f;
     scaled.principalPointY = (config.principalPointY + 0.5f)*scaleY - 0.5f;
     return scaled;
+}
+
+/*!
+ * \brief CameraImageSaver::getLensLimits
+ * finds the part of the view that createPinholeImage() or createFisheyeImage() can show in the image,
+ * a direction is in the image if it is inside these limits and its pixel is inside the image,
+ * opengl context is needed for the largest framebuffer size
+ * \param config camera in the resolution of the saved image
+ * \return limits of the lens
+ */
+CameraImageSaver::LensLimits CameraImageSaver::getLensLimits(const CameraObjectConfig &config)
+{
+    LensLimits limits;
+    const int width = static_cast<int>(lroundf(config.resolutionWidth));
+    const int height = static_cast<int>(lroundf(config.resolutionHeight));
+    const double fx = config.focalLength*config.resolutionWidth/config.sensorWidth;
+    const double fy = config.focalLength*config.resolutionHeight/config.sensorHeight;
+    limits.area[0] = -0.5f;
+    limits.area[1] = -0.5f;
+    limits.area[2] = static_cast<float>(width) - 0.5f;
+    limits.area[3] = static_cast<float>(height) - 0.5f;
+    limits.maxRadius2 = FLT_MAX;
+    limits.maxTheta = static_cast<float>(M_PI);
+    if (config.fisheye) {
+        const double k[4] = { config.fisheyeDistortion[0], config.fisheyeDistortion[1],
+                              config.fisheyeDistortion[2], config.fisheyeDistortion[3] };
+        // Newton's method of createFisheyeImage() needs a growing distorted angle
+        double maxTheta = std::min(M_PI, config.fieldOfView/2.0*M_PI/180.0);
+        for (int i=1;i<=FISHEYE_LIMIT_STEPS;i++) {
+            const double theta = M_PI*static_cast<double>(i)/FISHEYE_LIMIT_STEPS;
+            const double theta2 = theta*theta;
+            if (1.0 + theta2*(3.0*k[0] + theta2*(5.0*k[1] + theta2*(7.0*k[2] + theta2*9.0*k[3]))) <= 0.0) {
+                maxTheta = std::min(maxTheta, theta);
+                break;
+            }
+        }
+        limits.maxTheta = static_cast<float>(maxTheta);
+        return limits;
+    }
+    const cv::Mat cameraMatrix = (cv::Mat_<double>(3, 3) <<
+                                  fx, 0.0, config.principalPointX,
+                                  0.0, fy, config.principalPointY,
+                                  0.0, 0.0, 1.0);
+    const cv::Mat distortion = (cv::Mat_<double>(1, 8) <<
+                                config.radialDistortion[0], config.radialDistortion[1],
+                                config.tangentialDistortion[0], config.tangentialDistortion[1],
+                                config.radialDistortion[2], config.radialDistortion[3],
+                                config.radialDistortion[4], config.radialDistortion[5]);
+    if (cv::countNonZero(distortion) == 0) {
+        return limits;
+    }
+    const cv::Rect area = getDistortedArea(cameraMatrix, distortion, width, height);
+    limits.area[0] = static_cast<float>(area.x) - 0.5f;
+    limits.area[1] = static_cast<float>(area.y) - 0.5f;
+    limits.area[2] = static_cast<float>(area.x + area.width) - 0.5f;
+    limits.area[3] = static_cast<float>(area.y + area.height) - 0.5f;
+    // the distortion can turn back outside of the image, so the undistorted radius is limited to the image corners
+    std::vector<cv::Point2f> edgePoints, undistortedPoints;
+    for (int i=0;i<=DISTORTION_EDGE_POINTS;i++) {
+        const float rate = static_cast<float>(i)/static_cast<float>(DISTORTION_EDGE_POINTS);
+        const float x = rate*static_cast<float>(width) - 0.5f;
+        const float y = rate*static_cast<float>(height) - 0.5f;
+        edgePoints.push_back(cv::Point2f(x, -0.5f));
+        edgePoints.push_back(cv::Point2f(x, static_cast<float>(height) - 0.5f));
+        edgePoints.push_back(cv::Point2f(-0.5f, y));
+        edgePoints.push_back(cv::Point2f(static_cast<float>(width) - 0.5f, y));
+    }
+    cv::undistortPoints(edgePoints, undistortedPoints, cameraMatrix, distortion, cv::noArray(), cv::noArray(),
+                        getUndistortCriteria());
+    float maxRadius2 = 0.0f;
+    for (const cv::Point2f &point : undistortedPoints) {
+        maxRadius2 = std::max(maxRadius2, point.x*point.x + point.y*point.y);
+    }
+    limits.maxRadius2 = maxRadius2*LENS_LIMIT_MARGIN;
+    return limits;
 }
 
 /*!
