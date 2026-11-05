@@ -48,13 +48,26 @@ it can be used together with --takePictures, for example:
     prj-camera-image-creator --camerasVisible=0
 
 --camerasVisible=0 hides and --camerasVisible=1 shows the cameras at the start, instead of camerasVisible
-of configs/general.ini, key 'c' still toggles them.
+of configs/general.ini, key 'c' still toggles them. The label next to the "Hidden areas" label shows "Cameras: shown"
+or "Cameras: hidden".
 
 # Showing what the cameras cannot see
 Key 'h' shows every surface (floor, cubes, camera objects) and the sky that none of the cameras can see as black,
-pressing 'h' again shows them normally. A camera sees a pixel if its lens puts it inside the saved image
+pressing 'h' again shows them normally. The label next to the "Click a pixel" label shows "Hidden areas: black" or
+"Hidden areas: shown". A camera sees a pixel if its lens puts it inside the saved image
 (resolution of imageOutputScale, distortion and field of view of cameraObjectsFile) and no nearer surface is
 in front of it. Saved pictures are not changed by 'h'.
+
+# Distance of a pixel
+Left mouse click on a pixel shows its distance in the label at the top left corner (white text on a blue background,
+"Click a pixel" before the first click), like in prj-camera-image-viewer:
+
+    <x>/<y> Distance from camera: <distance> mm
+
+x/y is the window pixel from the top left corner and the distance is from the position of the current view (base camera
+or camera object) to the surface at that pixel, rendered like the distances of the saved data files. In the camera
+object view the text starts with "Camera <number>". "Sky" means no surface at that pixel, "N/A" is outside of the
+image of the camera object view.
 
 # Tools
 

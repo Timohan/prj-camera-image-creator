@@ -30,6 +30,9 @@
 // so they are the same surface, then the cubes and then the camera objects
 #define SURFACE_FLOOR           1
 #define SURFACE_FIRST_CUBE      2
+// picked distances: pixel without objects (sky) and pixel outside of the image of the camera object view
+#define PICK_SKY                -1.0f
+#define PICK_OUTSIDE            -2.0f
 
 BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_directionLineVisible(true),
@@ -48,7 +51,15 @@ BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_moveSpeed(1000.0f),
     m_moveSpeedMouseWheel(1000.0f),
     m_yawDirection(0),
-    m_pitchDirection(0)
+    m_pitchDirection(0),
+    m_pickPending(false),
+    m_pickX(0.0f),
+    m_pickY(0.0f),
+    m_picked(false),
+    m_pickedWindowX(0),
+    m_pickedWindowY(0),
+    m_pickedCamera(0),
+    m_pickedDistance(PICK_OUTSIDE)
 {
     setupVisualPosition();
     // camerasVisible of the command line is used instead of general.ini
@@ -155,7 +166,133 @@ void BaseScene::customRender(float width, float height)
     // saved images and the maps are rendered without the visibility
     m_visibilityMap.setupShader(m_shader.generalShader(), false);
     m_visibilityMap.unbind();
+    if (m_pickPending) {
+        renderPick(mvp, viewMatrix, width, height);
+    }
     glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
+}
+
+/*!
+ * \brief BaseScene::renderPick
+ * renders the distance from the view position to every pixel of the current viewport like the saved distances
+ * (float framebuffer, exact also far away) and reads the distance of the picked pixel
+ * \param projection projection matrix of the view
+ * \param view view matrix of the view
+ * \param width, height size of the window
+ */
+void BaseScene::renderPick(const Matrix4x4 &projection, const Matrix4x4 &view, float width, float height)
+{
+    m_pickPending = false;
+    m_picked = true;
+    m_pickedWindowX = static_cast<int>(m_pickX);
+    m_pickedWindowY = static_cast<int>(m_pickY);
+    m_pickedCamera = m_cameraIndex;
+    m_pickedDistance = PICK_OUTSIDE;
+    const GLint windowWidth = static_cast<GLint>(width);
+    const GLint windowHeight = static_cast<GLint>(height);
+    // opengl rows start from the bottom
+    const GLint x = m_pickedWindowX;
+    const GLint y = windowHeight - 1 - m_pickedWindowY;
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    // camera object view is only in the middle of the window
+    if (x < viewport[0] || y < viewport[1] || x >= viewport[0] + viewport[2] || y >= viewport[1] + viewport[3]
+        || windowWidth <= 0 || windowHeight <= 0) {
+        return;
+    }
+
+    GLint oldFramebuffer, oldPackAlignment, oldClampFragmentColor, oldClampReadColor;
+    GLfloat oldClearColor[4];
+    GLuint framebuffer, renderbuffers[2];
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFramebuffer);
+    glGetIntegerv(GL_PACK_ALIGNMENT, &oldPackAlignment);
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, oldClearColor);
+    glGetIntegerv(GL_CLAMP_FRAGMENT_COLOR, &oldClampFragmentColor);
+    glGetIntegerv(GL_CLAMP_READ_COLOR, &oldClampReadColor);
+    const GLboolean oldBlend = glIsEnabled(GL_BLEND);
+
+    glGenFramebuffers(1, &framebuffer);
+    glGenRenderbuffers(2, renderbuffers);
+    glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[0]);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_R32F, windowWidth, windowHeight);
+    glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[1]);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, windowWidth, windowHeight);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffers[0]);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderbuffers[1]);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "Cannot create pick framebuffer " << windowWidth << "x" << windowHeight << std::endl;
+    } else {
+        // distances are larger than 1.0, so colors must not be clamped or blended
+        glClampColor(GL_CLAMP_FRAGMENT_COLOR, GL_FALSE);
+        glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
+        glDisable(GL_BLEND);
+        glClearColor(PICK_SKY, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        const VECTOR3 position = m_camera.getPosition();
+        // same objects as in the view, camera object does not see its own cone
+        renderScene(projection, view, m_cameraIndex-1, &position, false);
+        GLfloat distance = PICK_SKY;
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(x, y, 1, 1, GL_RED, GL_FLOAT, &distance);
+        m_pickedDistance = distance < 0.0f ? PICK_SKY : distance;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(oldFramebuffer));
+    glDeleteFramebuffers(1, &framebuffer);
+    glDeleteRenderbuffers(2, renderbuffers);
+    glPixelStorei(GL_PACK_ALIGNMENT, oldPackAlignment);
+    glClearColor(oldClearColor[0], oldClearColor[1], oldClearColor[2], oldClearColor[3]);
+    glClampColor(GL_CLAMP_FRAGMENT_COLOR, static_cast<GLenum>(oldClampFragmentColor));
+    glClampColor(GL_CLAMP_READ_COLOR, static_cast<GLenum>(oldClampReadColor));
+    if (oldBlend) {
+        glEnable(GL_BLEND);
+    }
+}
+
+/*!
+ * \brief BaseScene::pick
+ * the next render finds the distance of this window pixel
+ * \param x, y window pixels from the top left corner
+ */
+void BaseScene::pick(float x, float y)
+{
+    m_pickPending = true;
+    m_pickX = x;
+    m_pickY = y;
+}
+
+/*!
+ * \brief BaseScene::takePicked
+ * \return true once after every pick, then getPickedText() has its result
+ */
+bool BaseScene::takePicked()
+{
+    const bool picked = m_picked;
+    m_picked = false;
+    return picked;
+}
+
+/*!
+ * \brief BaseScene::getPickedText
+ * \return "<x>/<y> Distance from camera: <distance>" of the picked window pixel, "Camera <number> " before it in
+ * the camera object view, distance is from the position of the view in mm, "Sky" if no object is there or
+ * "N/A" outside of the image of the camera object view
+ */
+std::string BaseScene::getPickedText() const
+{
+    std::string text = std::to_string(m_pickedWindowX) + "/" + std::to_string(m_pickedWindowY) + " Distance from camera: ";
+    if (m_pickedCamera > 0) {
+        text = "Camera " + std::to_string(m_pickedCamera) + " " + text;
+    }
+    if (m_pickedDistance == PICK_OUTSIDE) {
+        return text + "N/A";
+    }
+    if (m_pickedDistance == PICK_SKY) {
+        return text + "Sky";
+    }
+    return text + std::to_string(std::llround(static_cast<double>(m_pickedDistance)*MM_TO_OPENGL_UNIT)) + " mm";
 }
 
 /*!
@@ -552,12 +689,30 @@ void BaseScene::toggleCameraObjects()
 }
 
 /*!
+ * \brief BaseScene::getCameraObjectsVisible
+ * \return true if the camera objects (cones) are shown
+ */
+bool BaseScene::getCameraObjectsVisible() const
+{
+    return m_cameraObjectsVisible;
+}
+
+/*!
  * \brief BaseScene::toggleHideUnseen
  * shows the pixels that no camera object sees (surfaces and sky) as black, or shows them normally
  */
 void BaseScene::toggleHideUnseen()
 {
     m_hideUnseen = !m_hideUnseen;
+}
+
+/*!
+ * \brief BaseScene::getHideUnseen
+ * \return true if the surfaces and the sky that no camera object sees are black
+ */
+bool BaseScene::getHideUnseen() const
+{
+    return m_hideUnseen;
 }
 
 void BaseScene::setupVisualPosition()

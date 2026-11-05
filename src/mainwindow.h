@@ -2,6 +2,9 @@
 #define MAINWINDOW_H
 
 #include <window/tg_mainwindow.h>
+#include <item2d/tg_mouse_capture.h>
+#include <item2d/tg_rectangle.h>
+#include <item2d/tg_textfield.h>
 #include "scene/base_scene.h"
 #include "scene/camera_key_listener.h"
 
@@ -21,7 +24,23 @@ protected:
 
 private:
     BaseScene m_baseScene;
+    // mouse on the whole window: left click picks a pixel, it is before the key listener, so the key listener
+    // gets the mouse wheel first (the last child gets the mouse events first)
+    TgMouseCapture m_mouseCapture;
     CameraKeyListener m_cameraKeyListener;
+    // picked pixel and its distance from the camera of the view, white text on a blue background
+    TgRectangle m_pixelBackground;
+    TgTextfield m_pixelText;
+    // shows if the areas that no camera sees are shown or black (key h)
+    TgRectangle m_hiddenBackground;
+    TgTextfield m_hiddenText;
+
+    // shows if the camera objects are shown or hidden (key c)
+    TgRectangle m_camerasBackground;
+    TgTextfield m_camerasText;
+
+    void updateHiddenText();
+    void updateCamerasText();
     bool m_takePictures;
     bool m_picturesRequested;
 };

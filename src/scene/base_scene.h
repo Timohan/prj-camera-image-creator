@@ -30,7 +30,9 @@ public:
     void moveToCamera(int index);
     void toggleDirectionLine();
     void toggleCameraObjects();
+    bool getCameraObjectsVisible() const;
     void toggleHideUnseen();
+    bool getHideUnseen() const;
     void requestSaveImages();
     void startTurn(int direction);
     void stopTurn(int direction);
@@ -38,6 +40,10 @@ public:
     void stopPitch(int direction);
     void moveCamera(float steps);
     bool updateTurn();
+    // picks the window pixel (from the top left corner) in the next render
+    void pick(float x, float y);
+    bool takePicked();
+    std::string getPickedText() const;
 
 private:
     CameraShader m_shader;
@@ -74,6 +80,15 @@ private:
     std::chrono::steady_clock::time_point m_turnStartTime;
     VECTOR3 m_turnStartDirection;
     VECTOR3 m_turnStartUpVector;
+    bool m_pickPending;                 // pick at m_pickX, m_pickY in the next render
+    float m_pickX;                      // window pixels from the top left corner
+    float m_pickY;
+    bool m_picked;                      // a pick was done and takePicked() has not returned it yet
+    int m_pickedWindowX;                // picked pixel, window pixels from the top left corner
+    int m_pickedWindowY;
+    int m_pickedCamera;                 // view of the pick, 0 is the base camera, 1-n is the camera object 1-n
+    // distance of the picked pixel from the view position in opengl units, PICK_SKY or PICK_OUTSIDE
+    float m_pickedDistance;
 
     void createCameraObjects();
     void createObjects();
@@ -86,6 +101,7 @@ private:
     void startTurnFromCurrent();
     void setTurnDirection(int *turnDirection, int direction);
     void setupVisualPosition();
+    void renderPick(const Matrix4x4 &projection, const Matrix4x4 &view, float width, float height);
 };
 
 #endif // BASE_SCENE_H
