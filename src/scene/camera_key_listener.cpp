@@ -20,7 +20,7 @@ void CameraKeyListener::connectOnToggleCameraObjects(std::function<void()> toggl
     m_toggleCameraObjects = toggleCameraObjects;
 }
 
-void CameraKeyListener::connectOnSaveImages(std::function<void()> saveImages)
+void CameraKeyListener::connectOnSaveImages(std::function<void(bool withData)> saveImages)
 {
     m_saveImages = saveImages;
 }
@@ -113,9 +113,9 @@ TgEventResult CameraKeyListener::handleEvent(TgEventData *eventData, const TgWin
     }
     if (eventData->m_type == TgEventType::EventTypeCharacterCallback
         && eventData->m_event.m_keyEvent.m_pressReleaseKey == TgPressReleaseKey::PressReleaseKey_NormalKey
-        && eventData->m_event.m_keyEvent.m_key == 's') {
+        && (eventData->m_event.m_keyEvent.m_key == 's' || eventData->m_event.m_keyEvent.m_key == 'a')) {
         if (m_saveImages) {
-            m_saveImages();
+            m_saveImages(eventData->m_event.m_keyEvent.m_key == 's');
         }
         return TgEventResult::EventResultCompleted;
     }

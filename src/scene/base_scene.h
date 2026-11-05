@@ -33,7 +33,8 @@ public:
     bool getCameraObjectsVisible() const;
     void toggleHideUnseen();
     bool getHideUnseen() const;
-    void requestSaveImages();
+    // withData: saves also the .dat files
+    void requestSaveImages(bool withData = true);
     void startTurn(int direction);
     void stopTurn(int direction);
     void startPitch(int direction);
@@ -72,6 +73,7 @@ private:
     std::string m_objectsFile;
     float m_imageOutputScale;
     bool m_saveImagesRequested;
+    bool m_saveDataRequested;           // .dat files are saved with the requested images
     float m_moveSpeed;
     float m_moveSpeedMouseWheel;
     // turning with arrow keys, yaw: -1 left, 1 right, pitch: -1 down, 1 up, 0 not turning
@@ -97,7 +99,7 @@ private:
     void createVisibilityMap();
     void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject,
                      const VECTOR3 *distanceFrom, bool surfacePass);
-    void saveCameraImages();
+    void saveCameraImages(bool withData);
     void startTurnFromCurrent();
     void setTurnDirection(int *turnDirection, int direction);
     void setupVisualPosition();

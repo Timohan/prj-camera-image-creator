@@ -44,6 +44,12 @@ If an unknown argument is given, the program prints the usage and exits with cod
 
 Does the same without showing the window, --silent can be used only together with --takePictures.
 
+# Saving only the pictures
+Key 's' saves the picture (png) and the data file (.dat) of every camera into the output directory, key 'a' saves
+only the pictures in the same way (same file names, resolution and lens), without the data files.
+The saved pictures and data files never have the camera objects, even if they are shown in the window (key 'c'),
+like the training images of prj-camera-image-learner.
+
 # Selecting the objects file
     prj-camera-image-creator --objectsFile=objects1.dat
 
@@ -65,7 +71,8 @@ Key 'h' shows every surface (floor, cubes, camera objects) and the sky that none
 pressing 'h' again shows them normally. The label next to the "Click a pixel" label shows "Hidden areas: black" or
 "Hidden areas: shown". A camera sees a pixel if its lens puts it inside the saved image
 (resolution of imageOutputScale, distortion and field of view of cameraObjectsFile) and no nearer surface is
-in front of it. Saved pictures are not changed by 'h'.
+in front of it (the camera objects never block the view, because they are not in the saved pictures).
+Saved pictures are not changed by 'h'.
 
 # Distance of a pixel
 Left mouse click on a pixel shows its distance in the label at the top left corner (white text on a blue background,
@@ -113,3 +120,14 @@ Every file has:
 
 The result depends only on the file number, so the same number always gives the same file.
 Use a file with `objectsFile=objects1.dat` in configs/general.ini.
+
+If objects0.dat is missing from the objects directory, it is created first (and printed as
+`objects0.dat (it was missing)`), it has:
+- 9 random cubes in each of the 4 corners (-x/-z, +x/-z, -x/+z, +x/+z), 36 cubes, at 1.5-15 m distance from 0/0/0,
+  every side 300-1500 mm, random texture (wood1-6.png, brick1-2.png), random yaw, pitch and roll,
+  every cube touches the floor and can be partly under it, cubes do not overlap and they are at least 1000 mm from
+  the cameraObjectPosition<number> positions,
+- 1-5 white spot lights with random positions and directions, each lights at least 5 cubes,
+- ambient light 0.1-0.5.
+
+The created objects0.dat is always the same. An existing objects0.dat is never changed.

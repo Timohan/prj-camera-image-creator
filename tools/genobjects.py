@@ -2,7 +2,9 @@
 """Generates objects<first>.dat ... objects<last>.dat into <cameraImageOutputDirectory>/camera_objects
 (cameraImageOutputDirectory of configs/general.ini):
 usage genobjects.py <first> <last>
-Cubes of objects0.dat are placed randomly, 1-3 random spot lights, random ambient light."""
+Cubes of objects0.dat are placed randomly, 1-3 random spot lights, random ambient light.
+If objects0.dat is missing, it is created first: 9 random cubes in each of the 4 corners (-x/-z, +x/-z, -x/+z, +x/+z),
+1-5 random spot lights and random ambient light."""
 import math, random, re, sys
 
 import os
@@ -22,6 +24,12 @@ LIGHT_AREA = 15000.0
 NUDGE = 2.0                         # mm, sample points are this far outside of the face
 SAMPLE_GRID = 7                     # points per side on every face
 SINK_RATE = 0.25                    # cube can sink at most this part of its height under the floor
+# objects0.dat when it is missing: cubes in every corner, cube side lengths in mm, textures of the images folder
+BASE_CUBES_PER_CORNER = 9
+BASE_CUBE_SIZE = (300.0, 1500.0)
+BASE_TEXTURES = ['wood1.png', 'wood2.png', 'wood3.png', 'wood4.png', 'wood5.png', 'wood6.png', 'brick1.png', 'brick2.png']
+BASE_LIGHTS = (1, 5)
+BASE_SEED = 'objects0'              # objects0.dat is always the same
 
 HEADER = """# Position of cube (x/y/z/SizeX/SizeY/SizeZ/Yaw/Pitch/Roll/wood.png)
 # in Cube, center position=x,y,z, size=sizeX,sizeY,SizeZ values mm, 2000=2.0f, Yaw/Pitch/Roll angle in degrees, and finally texture image as text string in images folder
@@ -186,6 +194,78 @@ def create_directory(directory):
         sys.exit('Could not create directory %s' % directory)
 
 
+def place_corner_cube(rng, size, corner, placed, cameras):
+    """random place, yaw, pitch and roll of a cube in the corner (sign of x and z), touching the floor, not too near
+    to the cameras and the placed cubes, None if no place is found"""
+    for _ in range(5000):
+        yaw, pitch, roll = [round(rng.uniform(0, 360), 1) for _ in range(3)]
+        angle = rng.uniform(0.0, math.pi/2.0)
+        distance = rng.uniform(MIN_CUBE_DISTANCE, MAX_CUBE_DISTANCE)
+        x = round(corner[0]*distance*math.sin(angle), -1)
+        z = round(corner[1]*distance*math.cos(angle), -1)
+        box0 = Box((0.0, 0.0, 0.0), size, yaw, pitch, roll)
+        extent = box0.highest_offset() - box0.lowest_offset()
+        sink = rng.uniform(0.0, SINK_RATE)*extent
+        y = math.floor((-box0.lowest_offset() - sink)*10.0)/10.0
+        box = Box((x, y, z), size, yaw, pitch, roll)
+        if any(box.distance(c) < MIN_CAMERA_DISTANCE for c in cameras):
+            continue
+        if any(math.dist(box.c, o.c) < box.radius + o.radius + CUBE_GAP for o in placed):
+            continue
+        return box, (x, y, z, yaw, pitch, roll)
+    return None
+
+
+def generate_base(cameras):
+    """text of objects0.dat: BASE_CUBES_PER_CORNER random cubes in every corner, 1-5 spot lights, ambient light"""
+    rng = random.Random(BASE_SEED)
+    corners = [((-1, 1), '-x/+y/+z'), ((1, 1), '+x/+y/+z'), ((-1, -1), '-x/+y/-z'), ((1, -1), '+x/+y/-z')]
+    while True:
+        boxes, sections = [], []
+        for corner, name in corners:
+            lines = []
+            for _ in range(BASE_CUBES_PER_CORNER):
+                size = tuple(round(rng.uniform(*BASE_CUBE_SIZE), -1) for _ in range(3))
+                texture = rng.choice(BASE_TEXTURES)
+                placed = place_corner_cube(rng, size, corner, boxes, cameras)
+                if not placed:
+                    break
+                box, (x, y, z, yaw, pitch, roll) = placed
+                boxes.append(box)
+                lines.append('Cube=%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%s\n'
+                             % (x, y, z, *size, yaw, pitch, roll, texture))
+            else:
+                sections.append('\n# random cubes in %s area within %d m distance\n' % (name, MAX_CUBE_DISTANCE/1000.0)
+                                + ''.join(lines))
+                continue
+            break
+        else:
+            lights = []
+            for _ in range(rng.randint(*BASE_LIGHTS)):
+                light = random_light(rng, boxes)
+                if not light:
+                    break
+                lights.append(light)
+            else:
+                break
+    ambient = round(rng.uniform(MIN_AMBIENT, MAX_AMBIENT), 2)
+    text = '# objects0.dat, random cubes in the 4 corners, the cubes of the other objects files are taken from here\n'
+    text += HEADER + ''.join(sections) + LIGHT_HEADER
+    for pos, d in lights:
+        text += 'SpotLight=%.1f/%.1f/%.1f/%.4f/%.4f/%.4f/%.1f/%.1f/1.0/1.0/1.0\n' % (*pos, *d, LIGHT_INNER, LIGHT_OUTER)
+    text += AMBIENT_HEADER + 'AmbientLight=%.2f/%.2f/%.2f\n' % (ambient, ambient, ambient)
+    return text
+
+
+def create_base(objects_directory, cameras):
+    """creates objects0.dat if it is missing"""
+    filename = os.path.join(objects_directory, 'objects0.dat')
+    if os.path.isfile(filename):
+        return
+    open(filename, 'w').write(generate_base(cameras))
+    print('objects0.dat (it was missing)', flush=True)
+
+
 def read_base_cubes(objects_directory):
     """cubes of objects0.dat of the objects directory"""
     filename = os.path.join(objects_directory, 'objects0.dat')
@@ -292,6 +372,7 @@ if __name__ == '__main__':
     objects_directory = read_objects_directory()
     create_directory(objects_directory)
     cameras = read_camera_positions()
+    create_base(objects_directory, cameras)
     base = read_base_cubes(objects_directory)
     first, last = int(sys.argv[1]), int(sys.argv[2])
     for n in range(first, last + 1):

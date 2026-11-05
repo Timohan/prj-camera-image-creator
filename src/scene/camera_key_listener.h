@@ -9,7 +9,7 @@
  * Listens key presses in handleEvent(). Key 0 selects the base camera (index 0)
  * and keys 1-6 select the camera objects (index 1-6 = camera object 0-5).
  * Key l toggles the direction line and key c toggles the camera object cones.
- * Key s saves the images of the camera objects.
+ * Key s saves the images and the .dat files of the camera objects, key a saves only the images.
  * Key h toggles the black color of the surfaces and the sky that no camera object sees.
  * Left and right arrow keys turn the camera while they are down
  * (direction -1 is left and 1 is right), up and down arrow keys turn
@@ -26,7 +26,8 @@ public:
     void connectOnCameraSelected(std::function<void(int index)> cameraSelected);
     void connectOnToggleDirectionLine(std::function<void()> toggleDirectionLine);
     void connectOnToggleCameraObjects(std::function<void()> toggleCameraObjects);
-    void connectOnSaveImages(std::function<void()> saveImages);
+    // withData is true for the key s and false for the key a
+    void connectOnSaveImages(std::function<void(bool withData)> saveImages);
     void connectOnToggleHideUnseen(std::function<void()> toggleHideUnseen);
     void connectOnTurnStart(std::function<void(int direction)> turnStart);
     void connectOnTurnStop(std::function<void(int direction)> turnStop);
@@ -41,7 +42,7 @@ private:
     std::function<void(int index)> m_cameraSelected;
     std::function<void()> m_toggleDirectionLine;
     std::function<void()> m_toggleCameraObjects;
-    std::function<void()> m_saveImages;
+    std::function<void(bool withData)> m_saveImages;
     std::function<void()> m_toggleHideUnseen;
     std::function<void(int direction)> m_turnStart;
     std::function<void(int direction)> m_turnStop;

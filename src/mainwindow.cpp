@@ -53,8 +53,8 @@ MainWindow::MainWindow(int width, int height, bool takePictures, const std::stri
         m_baseScene.toggleCameraObjects();
         updateCamerasText();
     });
-    m_cameraKeyListener.connectOnSaveImages([this]() {
-        m_baseScene.requestSaveImages();
+    m_cameraKeyListener.connectOnSaveImages([this](bool withData) {
+        m_baseScene.requestSaveImages(withData);
     });
     m_cameraKeyListener.connectOnToggleHideUnseen([this]() {
         m_baseScene.toggleHideUnseen();

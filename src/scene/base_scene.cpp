@@ -33,6 +33,9 @@
 // picked distances: pixel without objects (sky) and pixel outside of the image of the camera object view
 #define PICK_SKY                -1.0f
 #define PICK_OUTSIDE            -2.0f
+// hiddenCameraObject of renderScene() that hides all camera objects: saved images and the visibility maps never have
+// the camera objects (the training images of prj-camera-image-learner do not have them)
+#define NO_CAMERA_OBJECTS       -2
 
 BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_directionLineVisible(true),
@@ -48,6 +51,7 @@ BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_objectsFile(objectsFile),
     m_imageOutputScale(1.0f),
     m_saveImagesRequested(false),
+    m_saveDataRequested(false),
     m_moveSpeed(1000.0f),
     m_moveSpeedMouseWheel(1000.0f),
     m_yawDirection(0),
@@ -136,7 +140,8 @@ void BaseScene::customRender(float width, float height)
 
     if (m_saveImagesRequested) {
         m_saveImagesRequested = false;
-        saveCameraImages();
+        saveCameraImages(m_saveDataRequested);
+        m_saveDataRequested = false;
     }
     if (m_cameraIndex > 0) {
         // camera object view uses the lens of the camera object and the aspect ratio of its resolution
@@ -298,7 +303,7 @@ std::string BaseScene::getPickedText() const
 /*!
  * \brief BaseScene::createVisibilityMap
  * renders the distance maps of the camera objects like their saved images see the scene: in the resolution of
- * the saved images, without their own cone and with the camera objects and the direction line if they are visible
+ * the saved images, without the camera objects and with the direction line if it is visible
  */
 void BaseScene::createVisibilityMap()
 {
@@ -306,8 +311,8 @@ void BaseScene::createVisibilityMap()
     for (int i=0;i<m_cameraCount;i++) {
         listCamera.push_back(CameraImageSaver::getScaledConfig(m_listCameraObject[i].getConfig(), m_imageOutputScale));
     }
-    auto render = [this](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 &cameraPosition, int cameraIndex) {
-        renderScene(projection, view, cameraIndex, &cameraPosition, false);
+    auto render = [this](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 &cameraPosition, int) {
+        renderScene(projection, view, NO_CAMERA_OBJECTS, &cameraPosition, false);
     };
     if (m_visibilityMap.create(listCamera, render) != 0) {
         std::cerr << "Visibility of the cameras cannot be shown" << std::endl;
@@ -320,7 +325,8 @@ void BaseScene::createVisibilityMap()
  * renders the scene to the current framebuffer and viewport
  * \param projection projection matrix
  * \param view view matrix
- * \param hiddenCameraObject index of the camera object that is not rendered, -1 renders all
+ * \param hiddenCameraObject index of the camera object that is not rendered, -1 renders all (if they are visible),
+ * NO_CAMERA_OBJECTS renders none
  * \param distanceFrom if not nullptr, renders distance from this position to every pixel instead
  * of the colors (float framebuffer is needed), sky is not rendered
  * \param surfacePass with distanceFrom: renders the normal toward distanceFrom (rgb) and the surface number
@@ -366,7 +372,7 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
         glUniform1f(surfaceId, static_cast<float>(SURFACE_FIRST_CUBE + i));
         m_listCube[i].render();
     }
-    if (m_cameraObjectsVisible) {
+    if (m_cameraObjectsVisible && hiddenCameraObject != NO_CAMERA_OBJECTS) {
         // camera objects are not bent by the earth curve
         glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 0.0f);
         for (int i=0;i<m_cameraCount;i++) {
@@ -383,21 +389,25 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
 /*!
  * \brief BaseScene::requestSaveImages
  * images of the camera objects are saved when the next frame is rendered
+ * \param withData true saves also the .dat files (key s), false only the png files (key a), if both are requested
+ * before the next frame, the .dat files are saved
  */
-void BaseScene::requestSaveImages()
+void BaseScene::requestSaveImages(bool withData)
 {
     m_saveImagesRequested = true;
+    m_saveDataRequested = m_saveDataRequested || withData;
 }
 
 /*!
  * \brief BaseScene::saveCameraImages
  * saves image of every camera object to the output directory as
  * <objects filename>_<timestamp>_<camera number>.png, camera number is 1-cameraCount as in cameraobjects.ini,
- * and distance of every pixel to <objects filename>_<timestamp>_<camera number>.dat,
+ * and with withData the distance of every pixel to <objects filename>_<timestamp>_<camera number>.dat,
  * resolution of the images is imageOutputScale times the resolution of the camera,
  * images smaller than the camera resolution are rendered supersampling times larger and shrunk (anti-aliasing)
+ * \param withData true saves also the .dat files, false only the png files
  */
-void BaseScene::saveCameraImages()
+void BaseScene::saveCameraImages(bool withData)
 {
     if (m_outputDirectory.empty()) {
         std::cerr << "cameraImageOutputDirectory is not set in general.ini, images are not saved" << std::endl;
@@ -416,17 +426,18 @@ void BaseScene::saveCameraImages()
     // smaller images are rendered larger and shrunk, but never larger than the resolution of the camera
     const int supersampling = std::max(1, std::min(MAX_SUPERSAMPLING, static_cast<int>(floorf(1.0f/m_imageOutputScale + 0.0001f))));
     for (int i=0;i<m_cameraCount;i++) {
-        auto render = [this, i](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 *distanceFrom,
+        auto render = [this](const Matrix4x4 &projection, const Matrix4x4 &view, const VECTOR3 *distanceFrom,
                                 bool surfacePass) {
-            renderScene(projection, view, i, distanceFrom, surfacePass);
+            // saved images never have the camera objects, even if they are visible in the window
+            renderScene(projection, view, NO_CAMERA_OBJECTS, distanceFrom, surfacePass);
         };
         const std::string filename = (std::filesystem::path(m_outputDirectory)
                                       / (std::filesystem::path(m_objectsFile).stem().string() + "_" + timestamp + "_" + std::to_string(i + 1))).string();
         CameraObject camera;
         camera.setup(CameraImageSaver::getScaledConfig(m_listCameraObject[i].getConfig(), m_imageOutputScale), 1.0f);
         if (CameraImageSaver::save(camera, render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, supersampling,
-                                   i + 1, filename + ".png", filename + ".dat")) {
-            std::cout << "Saved " << filename << ".png and .dat" << std::endl;
+                                   i + 1, filename + ".png", withData ? filename + ".dat" : std::string())) {
+            std::cout << "Saved " << filename << (withData ? ".png and .dat" : ".png") << std::endl;
         }
     }
 }
@@ -682,7 +693,6 @@ void BaseScene::toggleDirectionLine()
 void BaseScene::toggleCameraObjects()
 {
     m_cameraObjectsVisible = !m_cameraObjectsVisible;
-    m_visibilityMapChanged = true;
 }
 
 /*!

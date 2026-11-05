@@ -156,7 +156,7 @@ CameraImageSaver::LensLimits CameraImageSaver::getLensLimits(const CameraObjectC
  * surface number and normal are of the same rendered pixel as the distance
  * \param cameraNumber number of the camera (1-cameraCount), it is saved to the data file
  * \param imageFilename full path of the png file
- * \param dataFilename full path of the binary data file
+ * \param dataFilename full path of the binary data file, if it is empty, only the png file is saved
  * \return true on success
  */
 bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar, int supersampling,
@@ -177,6 +177,9 @@ bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &re
     if (!cv::imwrite(imageFilename, image)) {
         std::cerr << "Cannot save " << imageFilename << std::endl;
         return false;
+    }
+    if (dataFilename.empty()) {
+        return true;
     }
     return saveData(camera, cameraNumber, distance, surface, dataFilename);
 }
