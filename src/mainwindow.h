@@ -12,7 +12,7 @@ class MainWindow : public TgMainWindow
 {
 public:
     // takePictures: saves the pictures of the cameras at the start like the key s and exits,
-    // objectsFile: file in objectsDirectory of general.ini, if it is empty, objectsFile of general.ini is used,
+    // objectsFile: file in <cameraImageOutputDirectory>/camera_objects of general.ini, if it is empty, objectsFile of general.ini is used,
     // camerasVisible: 0 or 1, if it is -1, camerasVisible of general.ini is used
     MainWindow(int width, int height, bool takePictures = false, const std::string &objectsFile = std::string(),
                int camerasVisible = -1);

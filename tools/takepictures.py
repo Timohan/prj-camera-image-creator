@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Takes the pictures of every .dat file of objectsDirectory into outputDirectory of configs/general.ini:
+"""Takes the pictures of every .dat file of <cameraImageOutputDirectory>/camera_objects into
+<cameraImageOutputDirectory>/camera_output (cameraImageOutputDirectory of configs/general.ini):
 usage takepictures.py [--t<number of threads>], for example --t10 runs 10 programs at the same time, default is 1.
-Previous files of outputDirectory are moved to /tmp/image-creator-<timestamp> first. If all pictures are created,
+Previous files of the output directory are moved to /tmp/image-creator-<timestamp> first. If all pictures are created,
 the previous files are removed, if any objects file fails, the new files are removed and the previous files are
-moved back to outputDirectory."""
+moved back to the output directory."""
 import os, re, shutil, subprocess, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -14,15 +15,29 @@ GENERAL_INI = os.path.join(REPO, 'configs', 'general.ini')
 BACKUP_PREFIX = '/tmp/image-creator-'
 
 
-def read_directory(key):
-    """directory of the key of general.ini, relative path is relative to the repository like for the program"""
+def read_directory(subdirectory):
+    """<cameraImageOutputDirectory of general.ini>/subdirectory, relative path is relative to the repository like for
+    the program, None if cameraImageOutputDirectory is missing"""
+    key = 'cameraImageOutputDirectory='
     for line in open(GENERAL_INI):
         line = line.strip()
-        if line.startswith(key + '='):
-            directory = line[len(key) + 1:].strip()
+        if line.startswith(key):
+            directory = line[len(key):].strip()
             if directory:
-                return os.path.abspath(os.path.join(REPO, os.path.expanduser(directory)))
+                return os.path.abspath(os.path.join(REPO, os.path.expanduser(directory), subdirectory))
     return None
+
+
+def create_directory(directory):
+    """creates the directory and its parents if they do not exist, False and an error if it cannot be created"""
+    try:
+        os.makedirs(directory, exist_ok=True)
+    except OSError:
+        pass
+    if not os.path.isdir(directory):
+        print('Could not create directory %s' % directory)
+        return False
+    return True
 
 
 def check_output_directory(directory):
@@ -142,26 +157,28 @@ def main():
     if threads is None:
         print('usage: takepictures.py [--t<number of threads>], for example --t10')
         return 1
-    output_directory = read_directory('outputDirectory')
+    output_directory = read_directory('camera_output')
     if not output_directory:
-        print('Error: outputDirectory is not set in %s' % GENERAL_INI)
+        print('Error: cameraImageOutputDirectory is not set in %s' % GENERAL_INI)
         return 1
     if not check_output_directory(output_directory):
-        print('Error: outputDirectory %s contains the home directory or the repository, nothing is done' % output_directory)
+        print('Error: output directory %s contains the home directory or the repository, nothing is done' % output_directory)
         return 1
     if not os.access(PROGRAM, os.X_OK):
         print('Error: %s is missing, build it with make' % PROGRAM)
         return 1
-    objects_directory = read_directory('objectsDirectory')
-    if not objects_directory or not os.path.isdir(objects_directory):
-        print('Error: objectsDirectory of %s is missing or it is not a directory' % GENERAL_INI)
+    objects_directory = read_directory('camera_objects')
+    if not os.path.isdir(objects_directory):
+        print('Error: objects directory %s is missing, create the objects files with tools/genobjects.py'
+              % objects_directory)
         return 1
     objects_files = find_objects_files(objects_directory)
     if not objects_files:
         print('Error: no .dat files in %s' % objects_directory)
         return 1
 
-    os.makedirs(output_directory, exist_ok=True)
+    if not create_directory(output_directory):
+        return 1
     backup_directory = BACKUP_PREFIX + time.strftime('%Y%m%d-%H%M%S')
     os.makedirs(backup_directory)
     move_all(output_directory, backup_directory)

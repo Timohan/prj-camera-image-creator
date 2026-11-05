@@ -18,7 +18,7 @@
 class BaseScene
 {
 public:
-    // objectsFile: file in objectsDirectory of general.ini, if it is empty, objectsFile of general.ini is used,
+    // objectsFile: file in <cameraImageOutputDirectory>/camera_objects of general.ini, if it is empty, objectsFile of general.ini is used,
     // camerasVisible: 0 or 1, if it is -1, camerasVisible of general.ini is used
     explicit BaseScene(const std::string &objectsFile = std::string(), int camerasVisible = -1);
     ~BaseScene();
@@ -68,7 +68,7 @@ private:
     int m_cameraIndex;
     std::string m_outputDirectory;
     std::string m_cameraObjectsFile;
-    std::string m_objectsDirectory;     // objectsDirectory of general.ini
+    std::string m_objectsDirectory;     // <cameraImageOutputDirectory>/camera_objects of general.ini
     std::string m_objectsFile;
     float m_imageOutputScale;
     bool m_saveImagesRequested;

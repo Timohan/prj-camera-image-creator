@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Generates objects<first>.dat ... objects<last>.dat into objectsDirectory of configs/general.ini:
+"""Generates objects<first>.dat ... objects<last>.dat into <cameraImageOutputDirectory>/camera_objects
+(cameraImageOutputDirectory of configs/general.ini):
 usage genobjects.py <first> <last>
 Cubes of objects0.dat are placed randomly, 1-3 random spot lights, random ambient light."""
 import math, random, re, sys
@@ -163,19 +164,35 @@ def read_camera_positions():
 
 
 def read_objects_directory():
-    """objectsDirectory of general.ini, relative path is relative to the repository like for the program"""
+    """<cameraImageOutputDirectory of general.ini>/camera_objects, relative path is relative to the repository like
+    for the program"""
+    key = 'cameraImageOutputDirectory='
     for line in open(REPO + '/configs/general.ini'):
         line = line.strip()
-        if line.startswith('objectsDirectory='):
-            directory = line[len('objectsDirectory='):].strip()
+        if line.startswith(key):
+            directory = line[len(key):].strip()
             if directory:
-                return os.path.abspath(os.path.join(REPO, os.path.expanduser(directory)))
-    sys.exit('Error: objectsDirectory is missing in configs/general.ini')
+                return os.path.abspath(os.path.join(REPO, os.path.expanduser(directory), 'camera_objects'))
+    sys.exit('Error: cameraImageOutputDirectory is missing in configs/general.ini')
+
+
+def create_directory(directory):
+    """creates the directory and its parents if they do not exist, exits with an error if it cannot be created"""
+    try:
+        os.makedirs(directory, exist_ok=True)
+    except OSError:
+        pass
+    if not os.path.isdir(directory):
+        sys.exit('Could not create directory %s' % directory)
 
 
 def read_base_cubes(objects_directory):
+    """cubes of objects0.dat of the objects directory"""
+    filename = os.path.join(objects_directory, 'objects0.dat')
+    if not os.path.isfile(filename):
+        sys.exit('Error: %s is missing, the cubes of the generated files are taken from it' % filename)
     cubes = []
-    for line in open(os.path.join(objects_directory, 'objects0.dat')):
+    for line in open(filename):
         if line.startswith('Cube='):
             v = line[5:].strip().split('/')
             cubes.append((tuple(float(x) for x in v[3:6]), v[9]))
@@ -273,6 +290,7 @@ def generate(number, cameras, base):
 
 if __name__ == '__main__':
     objects_directory = read_objects_directory()
+    create_directory(objects_directory)
     cameras = read_camera_positions()
     base = read_base_cubes(objects_directory)
     first, last = int(sys.argv[1]), int(sys.argv[2])

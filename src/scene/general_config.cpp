@@ -1,8 +1,12 @@
 #include "general_config.h"
 #include "ini_file.h"
 #include <iostream>
+#include <filesystem>
 
 #define MM_TO_OPENGL_UNIT   1000.0f
+// subdirectories of cameraImageOutputDirectory: saved camera images and objects files
+#define CAMERA_OUTPUT_SUBDIRECTORY  "camera_output"
+#define CAMERA_OBJECTS_SUBDIRECTORY "camera_objects"
 
 /*!
  * \brief readPositive
@@ -49,11 +53,13 @@ bool GeneralConfig::read(const std::string &filename)
     if (!ini.read(filename)) {
         return false;
     }
-    if (!ini.getString("outputDirectory", &m_outputDirectory) || m_outputDirectory.empty()) {
-        std::cerr << filename << ": outputDirectory is missing, camera images cannot be saved" << std::endl;
-    }
-    if (!ini.getString("objectsDirectory", &m_objectsDirectory) || m_objectsDirectory.empty()) {
-        std::cerr << filename << ": objectsDirectory is missing, objects cannot be read" << std::endl;
+    std::string cameraImageOutputDirectory;
+    if (!ini.getString("cameraImageOutputDirectory", &cameraImageOutputDirectory) || cameraImageOutputDirectory.empty()) {
+        std::cerr << filename << ": cameraImageOutputDirectory is missing, camera images cannot be saved and objects "
+                  << "cannot be read" << std::endl;
+    } else {
+        m_outputDirectory = (std::filesystem::path(cameraImageOutputDirectory) / CAMERA_OUTPUT_SUBDIRECTORY).string();
+        m_objectsDirectory = (std::filesystem::path(cameraImageOutputDirectory) / CAMERA_OBJECTS_SUBDIRECTORY).string();
     }
     readPositive(ini, "moveSpeed", &m_moveSpeed);
     readPositive(ini, "moveSpeedMouseWheel", &m_moveSpeedMouseWheel);
@@ -99,6 +105,23 @@ bool GeneralConfig::read(const std::string &filename)
     m_basePosition.y = position.y/MM_TO_OPENGL_UNIT;
     m_basePosition.z = position.z/MM_TO_OPENGL_UNIT;
     m_baseDirection = Math3D::Vec3Normalize(direction);
+    return true;
+}
+
+/*!
+ * \brief GeneralConfig::createDirectory
+ * creates the directory and its parents if they do not exist
+ * \param directory directory to create
+ * \return true if the directory exists now, on failure prints "Could not create directory <directory>"
+ */
+bool GeneralConfig::createDirectory(const std::string &directory)
+{
+    std::error_code error;
+    std::filesystem::create_directories(directory, error);
+    if (error || !std::filesystem::is_directory(directory, error)) {
+        std::cerr << "Could not create directory " << directory << std::endl;
+        return false;
+    }
     return true;
 }
 

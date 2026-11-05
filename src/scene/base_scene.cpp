@@ -400,13 +400,10 @@ void BaseScene::requestSaveImages()
 void BaseScene::saveCameraImages()
 {
     if (m_outputDirectory.empty()) {
-        std::cerr << "outputDirectory is not set in general.ini, images are not saved" << std::endl;
+        std::cerr << "cameraImageOutputDirectory is not set in general.ini, images are not saved" << std::endl;
         return;
     }
-    std::error_code error;
-    std::filesystem::create_directories(m_outputDirectory, error);
-    if (error) {
-        std::cerr << "Cannot create " << m_outputDirectory << ": " << error.message() << std::endl;
+    if (!GeneralConfig::createDirectory(m_outputDirectory)) {
         return;
     }
 

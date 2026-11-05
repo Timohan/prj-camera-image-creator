@@ -24,11 +24,20 @@ sudo ldconfig
 
 test: pkg-config --modversion opencv4
 
+# Directories
+cameraImageOutputDirectory of configs/general.ini (/mnt/camera) has two directories:
+- `<cameraImageOutputDirectory>/camera_output` (output directory): the saved pictures and data files,
+- `<cameraImageOutputDirectory>/camera_objects` (objects directory): the objects files (cubes and lights), objects0.dat
+  has the cubes that tools/genobjects.py places.
+
+The program and the tools create a directory (and its parents) when they save files there and it does not exist,
+if it cannot be created, they print `Could not create directory <directory>`.
+
 # Taking pictures
     prj-camera-image-creator --takePictures
 
 Starts the program, saves the pictures and data files of all cameras exactly like pressing 's'
-(into outputDirectory of configs/general.ini, from the objects file of objectsFile) and then exits with code 0.
+(into the output directory, from the objects file of objectsFile) and then exits with code 0.
 If an unknown argument is given, the program prints the usage and exits with code 1.
 
     prj-camera-image-creator --takePictures --silent
@@ -38,7 +47,7 @@ Does the same without showing the window, --silent can be used only together wit
 # Selecting the objects file
     prj-camera-image-creator --objectsFile=objects1.dat
 
-Uses the given file of objectsDirectory of configs/general.ini (/home/timo/camera_original_objects) instead of
+Uses the given file of the objects directory (`<cameraImageOutputDirectory>/camera_objects`) instead of
 objectsFile of configs/general.ini,
 it can be used together with --takePictures, for example:
 
@@ -72,8 +81,8 @@ image of the camera object view.
 # Tools
 
 ## tools/takepictures.py
-Takes the pictures of every .dat file of objectsDirectory of configs/general.ini (like `--takePictures --silent --camerasVisible=0 --objectsFile=<file>`)
-into outputDirectory of configs/general.ini, the windows are not shown. Build the program first with make.
+Takes the pictures of every .dat file of the objects directory (like `--takePictures --silent --camerasVisible=0 --objectsFile=<file>`)
+into the output directory, the windows are not shown. Build the program first with make.
 
     python3 tools/takepictures.py [--t<number of threads>]
 
@@ -81,17 +90,17 @@ into outputDirectory of configs/general.ini, the windows are not shown. Build th
 Each program uses about 0.5 GB memory, on a 16 core machine 8 threads was about 7 times faster than 1 thread,
 more than 8 threads was not faster.
 
-Previous files of outputDirectory are first moved to /tmp/image-creator-<timestamp>.
+Previous files of the output directory are first moved to /tmp/image-creator-<timestamp>.
 If all pictures are created, the previous files are removed.
 If even one objects file fails, the script stops, prints which file failed, removes the new files
-and moves the previous files back to outputDirectory.
+and moves the previous files back to the output directory.
 
 ## tools/genobjects.py
-Generates random objects files into objectsDirectory of configs/general.ini. Needs only Python 3.
+Generates random objects files into the objects directory. Needs only Python 3.
 
     python3 tools/genobjects.py <first> <last>
 
-For example `python3 tools/genobjects.py 1 99` writes objects1.dat ... objects99.dat of objectsDirectory
+For example `python3 tools/genobjects.py 1 99` writes objects1.dat ... objects99.dat of the objects directory
 (existing files with the same names are overwritten).
 
 Every file has:
