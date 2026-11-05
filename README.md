@@ -1,6 +1,21 @@
 # prj-camera-image-creator
 Camera image creator
 
+# prj-tg-ui-lib requirement
+The window, the labels and the keyboard and mouse input are from prj-tg-ui-lib
+(https://github.com/Timohan/prj-tg-ui-lib.git), it needs prj-ttf-reader (https://github.com/Timohan/prj-ttf-reader)
+and the packages libglew-dev, libpng-dev, libglfw3-dev, make and build-essential:
+
+    sudo apt install libglew-dev libpng-dev libglfw3-dev make build-essential
+    git clone https://github.com/Timohan/prj-ttf-reader.git
+    (build and install prj-ttf-reader as told in its README)
+    git clone https://github.com/Timohan/prj-tg-ui-lib.git
+    cd prj-tg-ui-lib/lib
+    make
+    sudo make install
+
+test: pkg-config --modversion prj-tg-ui-lib
+
 # OpenCV requirement
 git clone https://github.com/opencv/opencv.git
 git clone https://github.com/opencv/opencv_contrib.git
