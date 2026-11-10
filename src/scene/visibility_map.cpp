@@ -1,7 +1,7 @@
 #include "visibility_map.h"
 #include <GL/gl.h>
 #include <algorithm>
-#include <iostream>
+#include "global_log.h"
 #include <math.h>
 #include <string>
 #include "camera_image_saver.h"
@@ -52,7 +52,7 @@ int VisibilityMap::create(const std::vector<CameraObjectConfig> &listCamera, con
     unbind();
     const int count = std::min(static_cast<int>(listCamera.size()), CAMERA_SHADER_MAX_VISIBILITY_CAMERAS);
     if (count < static_cast<int>(listCamera.size())) {
-        std::cerr << "Only " << CAMERA_SHADER_MAX_VISIBILITY_CAMERAS << " cameras are used for the visibility" << std::endl;
+        TG_ERROR_LOG("Only", CAMERA_SHADER_MAX_VISIBILITY_CAMERAS, "cameras are used for the visibility");
     }
     GLint maxTextureSize, maxRenderbufferSize, maxViewport[2];
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
@@ -129,7 +129,7 @@ int VisibilityMap::create(const std::vector<CameraObjectConfig> &listCamera, con
         m_listCamera.push_back(camera);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, camera.texture, 0);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            std::cerr << "Cannot create visibility framebuffer " << width << "x" << m_faceSize << std::endl;
+            TG_ERROR_LOG("Cannot create visibility framebuffer", std::to_string(width) + "x" + std::to_string(m_faceSize));
             result = 1;
             break;
         }

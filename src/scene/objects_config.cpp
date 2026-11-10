@@ -1,6 +1,6 @@
 #include "objects_config.h"
 #include "ini_file.h"
-#include <iostream>
+#include "global_log.h"
 
 #define MM_TO_OPENGL_UNIT   1000.0f
 // x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll before the texture
@@ -31,12 +31,12 @@ bool ObjectsConfig::read(const std::string &filename)
 
         if (textureBegin == std::string::npos
             || !IniFile::parseFloats(value.substr(0, textureBegin), values, CUBE_VALUE_COUNT)) {
-            std::cerr << filename << ": Cube=" << value << " is invalid" << std::endl;
+            TG_ERROR_LOG(filename + ": Cube=" + value, "is invalid");
             return false;
         }
         cube.texture = value.substr(textureBegin + 1);
         if (values[3] <= 0.0f || values[4] <= 0.0f || values[5] <= 0.0f || cube.texture.empty()) {
-            std::cerr << filename << ": Cube=" << value << " must have positive size and texture" << std::endl;
+            TG_ERROR_LOG(filename + ": Cube=" + value, "must have positive size and texture");
             return false;
         }
         cube.position = { values[0]/MM_TO_OPENGL_UNIT, values[1]/MM_TO_OPENGL_UNIT, values[2]/MM_TO_OPENGL_UNIT };
@@ -51,7 +51,7 @@ bool ObjectsConfig::read(const std::string &filename)
         float values[SPOT_LIGHT_VALUE_COUNT];
 
         if (!IniFile::parseFloats(value, values, SPOT_LIGHT_VALUE_COUNT)) {
-            std::cerr << filename << ": SpotLight=" << value << " is invalid" << std::endl;
+            TG_ERROR_LOG(filename + ": SpotLight=" + value, "is invalid");
             return false;
         }
         light.position = { values[0]/MM_TO_OPENGL_UNIT, values[1]/MM_TO_OPENGL_UNIT, values[2]/MM_TO_OPENGL_UNIT };
@@ -61,15 +61,15 @@ bool ObjectsConfig::read(const std::string &filename)
         light.color = { values[8], values[9], values[10] };
         if ((light.direction.x == 0.0f && light.direction.y == 0.0f && light.direction.z == 0.0f)
             || light.innerAngle < 0.0f || light.innerAngle >= light.outerAngle || light.outerAngle > 180.0f) {
-            std::cerr << filename << ": SpotLight=" << value
-                      << " must have direction and 0 <= innerAngle < outerAngle <= 180" << std::endl;
+            TG_ERROR_LOG(filename + ": SpotLight=" + value,
+                         "must have direction and 0 <= innerAngle < outerAngle <= 180");
             return false;
         }
         light.direction = Math3D::Vec3Normalize(light.direction);
         listSpotLight.push_back(light);
     }
     if (ini.hasKey("AmbientLight") && !ini.getVector("AmbientLight", &m_ambientLight)) {
-        std::cerr << filename << ": AmbientLight is invalid" << std::endl;
+        TG_ERROR_LOG(filename + ": AmbientLight is invalid");
         return false;
     }
     m_listCube = listCube;

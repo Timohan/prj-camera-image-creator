@@ -3,7 +3,7 @@
 #include "cameraobjects_config.h"
 #include "general_config.h"
 #include "camera_image_saver.h"
-#include <iostream>
+#include "global_log.h"
 #include <filesystem>
 #include <time.h>
 #include <math.h>
@@ -227,7 +227,7 @@ void BaseScene::renderPick(const Matrix4x4 &projection, const Matrix4x4 &view, f
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffers[0]);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderbuffers[1]);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Cannot create pick framebuffer " << windowWidth << "x" << windowHeight << std::endl;
+        TG_ERROR_LOG("Cannot create pick framebuffer", std::to_string(windowWidth) + "x" + std::to_string(windowHeight));
     } else {
         // distances are larger than 1.0, so colors must not be clamped or blended
         glClampColor(GL_CLAMP_FRAGMENT_COLOR, GL_FALSE);
@@ -315,7 +315,7 @@ void BaseScene::createVisibilityMap()
         renderScene(projection, view, NO_CAMERA_OBJECTS, &cameraPosition, false);
     };
     if (m_visibilityMap.create(listCamera, render) != 0) {
-        std::cerr << "Visibility of the cameras cannot be shown" << std::endl;
+        TG_ERROR_LOG("Visibility of the cameras cannot be shown");
     }
     m_visibilityMapChanged = false;
 }
@@ -410,7 +410,7 @@ void BaseScene::requestSaveImages(bool withData)
 void BaseScene::saveCameraImages(bool withData)
 {
     if (m_outputDirectory.empty()) {
-        std::cerr << "cameraImageOutputDirectory is not set in general.ini, images are not saved" << std::endl;
+        TG_ERROR_LOG("cameraImageOutputDirectory is not set in general.ini, images are not saved");
         return;
     }
     if (!GeneralConfig::createDirectory(m_outputDirectory)) {
@@ -437,7 +437,7 @@ void BaseScene::saveCameraImages(bool withData)
         camera.setup(CameraImageSaver::getScaledConfig(m_listCameraObject[i].getConfig(), m_imageOutputScale), 1.0f);
         if (CameraImageSaver::save(camera, render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, supersampling,
                                    i + 1, filename + ".png", withData ? filename + ".dat" : std::string())) {
-            std::cout << "Saved " << filename << (withData ? ".png and .dat" : ".png") << std::endl;
+            TG_INFO_LOG("Saved", filename + (withData ? ".png and .dat" : ".png"));
         }
     }
 }
@@ -482,7 +482,7 @@ void BaseScene::createObjects()
     }
     for (int i=0;i<config.getSpotLightCount();i++) {
         if (i == CAMERA_SHADER_MAX_SPOT_LIGHTS) {
-            std::cerr << "Only " << CAMERA_SHADER_MAX_SPOT_LIGHTS << " spot lights are used" << std::endl;
+            TG_ERROR_LOG("Only", CAMERA_SHADER_MAX_SPOT_LIGHTS, "spot lights are used");
             break;
         }
         m_listSpotLight.push_back(config.getSpotLight(i));

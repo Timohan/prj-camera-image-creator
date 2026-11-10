@@ -1,6 +1,6 @@
 #include "cameraobjects_config.h"
 #include "ini_file.h"
-#include <iostream>
+#include "global_log.h"
 
 #define MM_TO_OPENGL_UNIT   1000.0f
 
@@ -15,12 +15,12 @@ static bool readOptional(const IniFile &ini, const std::string &key, float *valu
         return true;
     }
     if (!ini.getFloats(key, values, count)) {
-        std::cerr << ini.getFilename() << ": " << key << " is invalid" << std::endl;
+        TG_ERROR_LOG(ini.getFilename() + ":", key, "is invalid");
         return false;
     }
     for (int i=0;i<count && mustBePositive;i++) {
         if (values[i] <= 0.0f) {
-            std::cerr << ini.getFilename() << ": " << key << " must be positive" << std::endl;
+            TG_ERROR_LOG(ini.getFilename() + ":", key, "must be positive");
             return false;
         }
     }
@@ -48,11 +48,11 @@ bool CameraObjectsConfig::read(const std::string &filename)
     }
     if (!ini.getFloat("cameraCount", &count)
         || count < 0 || count != static_cast<float>(static_cast<int>(count))) {
-        std::cerr << filename << ": cameraCount is missing or not a whole number" << std::endl;
+        TG_ERROR_LOG(filename + ": cameraCount is missing or not a whole number");
         return false;
     }
     if (!ini.getFloat("cameraSizeRate", &m_sizeRate) || m_sizeRate <= 0.0f) {
-        std::cerr << filename << ": cameraSizeRate is missing or not positive" << std::endl;
+        TG_ERROR_LOG(filename + ": cameraSizeRate is missing or not positive");
         return false;
     }
 
@@ -63,12 +63,12 @@ bool CameraObjectsConfig::read(const std::string &filename)
         const int number = i + 1;
         const std::string index = std::to_string(number);
         if (!ini.getVector("cameraObjectPosition" + index, &camera.position)) {
-            std::cerr << filename << ": cameraObjectPosition" << number << " is missing or invalid" << std::endl;
+            TG_ERROR_LOG(filename + ": cameraObjectPosition" + index, "is missing or invalid");
             return false;
         }
         if (!ini.getVector("cameraObjectDirection" + index, &camera.direction)
             || (camera.direction.x == 0.0f && camera.direction.y == 0.0f && camera.direction.z == 0.0f)) {
-            std::cerr << filename << ": cameraObjectDirection" << number << " is missing or invalid" << std::endl;
+            TG_ERROR_LOG(filename + ": cameraObjectDirection" + index, "is missing or invalid");
             return false;
         }
         float sensorSize[2] = { camera.sensorWidth, camera.sensorHeight };
@@ -101,7 +101,7 @@ bool CameraObjectsConfig::read(const std::string &filename)
         std::string distortionModel = "pinhole";
         ini.getString("cameraObjectDistortionModel" + index, &distortionModel);
         if (distortionModel != "pinhole" && distortionModel != "fisheye") {
-            std::cerr << filename << ": cameraObjectDistortionModel" << number << " must be pinhole or fisheye" << std::endl;
+            TG_ERROR_LOG(filename + ": cameraObjectDistortionModel" + index, "must be pinhole or fisheye");
             return false;
         }
         camera.fisheye = distortionModel == "fisheye";

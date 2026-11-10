@@ -1,7 +1,7 @@
 #include "shadow_map.h"
 #include <GL/gl.h>
 #include <algorithm>
-#include <iostream>
+#include "global_log.h"
 
 // size of the shadow map tile of one spot light in pixels
 #define SHADOW_MAP_SIZE             2048
@@ -84,7 +84,7 @@ int ShadowMap::create(GLuint shader, const std::vector<SpotLightConfig> &listSpo
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Shadow map framebuffer is not complete" << std::endl;
+        TG_ERROR_LOG("Shadow map framebuffer is not complete");
         glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previousFramebuffer));
         return 1;
     }

@@ -10,7 +10,7 @@
  */
 
 #include "camera_shader.h"
-#include <iostream>
+#include "global_log.h"
 
 GLuint CameraShader::m_shaderAttributeIndex[4] = {0,0,0,0};
 
@@ -319,14 +319,14 @@ int CameraShader::init()
     GLuint vertShader;
 
     if (compileShader(m_vertShader, GL_VERTEX_SHADER, &vertShader) != 0) {
-        std::cerr << "Compile shader failed vert" << std::endl;
+        TG_ERROR_LOG("Compile shader failed vert");
         return -1;
     }
     glAttachShader(shaderHandle, vertShader);
     glDeleteShader(vertShader);
 
     if (compileShader(m_fragShader, GL_FRAGMENT_SHADER, &fragShader) != 0) {
-        std::cerr << "Compile shader failed frag" << std::endl;
+        TG_ERROR_LOG("Compile shader failed frag");
         return -1;
     }
     glAttachShader(shaderHandle, fragShader);
@@ -336,7 +336,7 @@ int CameraShader::init()
 
     glGetProgramiv(shaderHandle, GL_LINK_STATUS, &status);
     if (status == GL_FALSE) {
-        std::cerr << "The link operation is failed" << std::endl;
+        TG_ERROR_LOG("The link operation is failed");
         return -1;
     }
     m_generalShader = shaderHandle;
@@ -363,7 +363,7 @@ int CameraShader::compileShader(const char *source, const GLenum type, GLuint *s
     GLuint shaderHandle = glCreateShader(type);
 
     if (shaderHandle == 0) {
-        std::cerr << "Creating the shader failed" << std::endl;
+        TG_ERROR_LOG("Creating the shader failed");
         return -1;
     }
 
@@ -375,7 +375,7 @@ int CameraShader::compileShader(const char *source, const GLenum type, GLuint *s
     if(status == GL_FALSE) {
         char infoLog[512];
         glGetShaderInfoLog(shaderHandle, sizeof(infoLog), nullptr, infoLog);
-        std::cerr << "Compiling shader failed: " << infoLog << std::endl;
+        TG_ERROR_LOG("Compiling shader failed:", infoLog);
         glDeleteShader(shaderHandle);
         return -1;
     }

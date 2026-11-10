@@ -1,6 +1,6 @@
 #include "general_config.h"
 #include "ini_file.h"
-#include <iostream>
+#include "global_log.h"
 #include <filesystem>
 
 #define MM_TO_OPENGL_UNIT   1000.0f
@@ -21,7 +21,7 @@ static void readPositive(const IniFile &ini, const std::string &key, float *valu
     if (ini.getFloat(key, &newValue) && newValue > 0.0f) {
         *value = newValue;
     } else {
-        std::cerr << ini.getFilename() << ": " << key << " is not positive, using " << *value << std::endl;
+        TG_ERROR_LOG(ini.getFilename() + ":", key, "is not positive, using", *value);
     }
 }
 
@@ -55,8 +55,8 @@ bool GeneralConfig::read(const std::string &filename)
     }
     std::string cameraImageOutputDirectory;
     if (!ini.getString("cameraImageOutputDirectory", &cameraImageOutputDirectory) || cameraImageOutputDirectory.empty()) {
-        std::cerr << filename << ": cameraImageOutputDirectory is missing, camera images cannot be saved and objects "
-                  << "cannot be read" << std::endl;
+        TG_ERROR_LOG(filename + ": cameraImageOutputDirectory is missing, camera images cannot be saved and objects "
+                     "cannot be read");
     } else {
         m_outputDirectory = (std::filesystem::path(cameraImageOutputDirectory) / CAMERA_OUTPUT_SUBDIRECTORY).string();
         m_objectsDirectory = (std::filesystem::path(cameraImageOutputDirectory) / CAMERA_OBJECTS_SUBDIRECTORY).string();
@@ -67,36 +67,36 @@ bool GeneralConfig::read(const std::string &filename)
     if (ini.hasKey("cameraObjectsFile")
         && (!ini.getString("cameraObjectsFile", &m_cameraObjectsFile) || m_cameraObjectsFile.empty())) {
         m_cameraObjectsFile = "cameraobjects.ini";
-        std::cerr << filename << ": cameraObjectsFile is empty, using " << m_cameraObjectsFile << std::endl;
+        TG_ERROR_LOG(filename + ": cameraObjectsFile is empty, using", m_cameraObjectsFile);
     }
     if (ini.hasKey("objectsFile")
         && (!ini.getString("objectsFile", &m_objectsFile) || m_objectsFile.empty())) {
         m_objectsFile = "objects0.dat";
-        std::cerr << filename << ": objectsFile is empty, using " << m_objectsFile << std::endl;
+        TG_ERROR_LOG(filename + ": objectsFile is empty, using", m_objectsFile);
     }
     if (ini.hasKey("camerasVisible")) {
         float visible;
         if (ini.getFloat("camerasVisible", &visible)) {
             m_camerasVisible = visible != 0.0f;
         } else {
-            std::cerr << filename << ": camerasVisible is not 0 or 1, using " << (m_camerasVisible ? 1 : 0) << std::endl;
+            TG_ERROR_LOG(filename + ": camerasVisible is not 0 or 1, using", (m_camerasVisible ? 1 : 0));
         }
     }
     if (!ini.getVector("baseObjectPosition", &position)) {
-        std::cerr << filename << ": baseObjectPosition is missing or invalid" << std::endl;
+        TG_ERROR_LOG(filename + ": baseObjectPosition is missing or invalid");
         return false;
     }
     if (!ini.getVector("baseObjectDirection", &direction)
         || (direction.x == 0.0f && direction.y == 0.0f && direction.z == 0.0f)) {
-        std::cerr << filename << ": baseObjectDirection is missing or invalid" << std::endl;
+        TG_ERROR_LOG(filename + ": baseObjectDirection is missing or invalid");
         return false;
     }
     if (!ini.getFloat("directionLineWidth", &lineWidth) || lineWidth <= 0.0f) {
-        std::cerr << filename << ": directionLineWidth is missing or not positive" << std::endl;
+        TG_ERROR_LOG(filename + ": directionLineWidth is missing or not positive");
         return false;
     }
     if (!ini.getFloat("directionLinePositionHeight", &lineHeight)) {
-        std::cerr << filename << ": directionLinePositionHeight is missing or invalid" << std::endl;
+        TG_ERROR_LOG(filename + ": directionLinePositionHeight is missing or invalid");
         return false;
     }
     m_directionLineWidth = lineWidth/MM_TO_OPENGL_UNIT;
@@ -119,7 +119,7 @@ bool GeneralConfig::createDirectory(const std::string &directory)
     std::error_code error;
     std::filesystem::create_directories(directory, error);
     if (error || !std::filesystem::is_directory(directory, error)) {
-        std::cerr << "Could not create directory " << directory << std::endl;
+        TG_ERROR_LOG("Could not create directory", directory);
         return false;
     }
     return true;

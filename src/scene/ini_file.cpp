@@ -1,6 +1,6 @@
 #include "ini_file.h"
 #include <fstream>
-#include <iostream>
+#include "global_log.h"
 #include <cstdlib>
 
 static std::string trim(const std::string &text)
@@ -34,7 +34,7 @@ bool IniFile::read(const std::string &filename)
     m_values.clear();
     m_listValues.clear();
     if (!file.is_open()) {
-        std::cerr << "Cannot open " << filename << std::endl;
+        TG_ERROR_LOG("Cannot open", filename);
         return false;
     }
     while (std::getline(file, line)) {

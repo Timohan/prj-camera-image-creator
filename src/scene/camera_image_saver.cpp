@@ -9,7 +9,7 @@
 #include <cfloat>
 #include <cstdint>
 #include <fstream>
-#include <iostream>
+#include "global_log.h"
 #include <math.h>
 #include <vector>
 
@@ -175,7 +175,7 @@ bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &re
         shrinkImage(supersampling, &image, &distance, &surface);
     }
     if (!cv::imwrite(imageFilename, image)) {
-        std::cerr << "Cannot save " << imageFilename << std::endl;
+        TG_ERROR_LOG("Cannot save", imageFilename);
         return false;
     }
     if (dataFilename.empty()) {
@@ -267,7 +267,7 @@ bool CameraImageSaver::saveData(const CameraObject &camera, int cameraNumber, co
 {
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {
-        std::cerr << "Cannot save " << filename << std::endl;
+        TG_ERROR_LOG("Cannot save", filename);
         return false;
     }
     auto writeUint32 = [&file](uint32_t value) {
@@ -357,7 +357,7 @@ bool CameraImageSaver::saveData(const CameraObject &camera, int cameraNumber, co
     }
 
     if (!file.good()) {
-        std::cerr << "Cannot save " << filename << std::endl;
+        TG_ERROR_LOG("Cannot save", filename);
         return false;
     }
     return true;
@@ -647,7 +647,7 @@ bool CameraImageSaver::renderImage(const RenderFunction &render, const Matrix4x4
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderbuffers[1]);
 
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-        std::cerr << "Cannot create framebuffer " << width << "x" << height << std::endl;
+        TG_ERROR_LOG("Cannot create framebuffer", std::to_string(width) + "x" + std::to_string(height));
         success = false;
     } else {
         glViewport(0, 0, width, height);
@@ -675,7 +675,7 @@ bool CameraImageSaver::renderImage(const RenderFunction &render, const Matrix4x4
         // distance pass to float color buffer, pixels without objects are sky
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffers[2]);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            std::cerr << "Cannot create distance framebuffer " << width << "x" << height << std::endl;
+            TG_ERROR_LOG("Cannot create distance framebuffer", std::to_string(width) + "x" + std::to_string(height));
             success = false;
         } else {
             // distances are larger than 1.0, so colors must not be clamped
@@ -695,7 +695,7 @@ bool CameraImageSaver::renderImage(const RenderFunction &render, const Matrix4x4
             // alpha is the surface number, so blending must not mix it into the colors
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffers[3]);
             if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-                std::cerr << "Cannot create surface framebuffer " << width << "x" << height << std::endl;
+                TG_ERROR_LOG("Cannot create surface framebuffer", std::to_string(width) + "x" + std::to_string(height));
                 success = false;
             } else {
                 const GLboolean oldBlend = glIsEnabled(GL_BLEND);
