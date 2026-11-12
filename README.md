@@ -48,6 +48,88 @@ cameraImageOutputDirectory of configs/general.ini (/mnt/camera) has two director
 The program and the tools create a directory (and its parents) when they save files there and it does not exist,
 if it cannot be created, they print `Could not create directory <directory>`.
 
+# Creating pictures (quick start)
+1. Build the program:
+
+       make
+
+2. Select the cameras in configs/general.ini with cameraObjectsFile (the camera files are in configs/):
+   - fisheye pictures: `cameraObjectsFile=cameraobjects_elp.ini` (6 ELP 180 degree fisheye cameras, fisheye lens
+     model, the area outside of the lens circle is black),
+   - non-fisheye pictures: `cameraObjectsFile=cameraobjects_ids.ini` (6 IDS cameras with a 4 mm lens, pinhole lens
+     model) or `cameraObjectsFile=cameraobjects.ini` (6 cameras with a 35 mm lens, no distortion).
+
+   The lens of every camera is cameraObjectDistortionModel<number> (fisheye or pinhole) of that file, so a file can
+   also mix them. imageOutputScale of configs/general.ini sets the resolution of the saved pictures
+   (0.1 is 1/10 of the camera resolution).
+3. Create the objects files (cubes and lights) with tools/genobjects.py and select one with objectsFile of
+   configs/general.ini. The objects files do not depend on the lens: genobjects.py places the cubes around the
+   camera positions of configs/cameraobjects.ini, which are the same in all three camera files. Keep the fisheye
+   and the non-fisheye pictures in their own cameraImageOutputDirectory, so they do not mix in one camera_output.
+   Example when /mnt/camera is empty:
+
+   Non-fisheye, set in configs/general.ini:
+
+       cameraImageOutputDirectory=/mnt/camera
+       cameraObjectsFile=cameraobjects_ids.ini
+       objectsFile=objects1.dat
+
+   and create the objects files:
+
+       python3 tools/genobjects.py 1 10
+
+   It prints `objects0.dat (it was missing)` and `objects1.dat` ... `objects10.dat`, and creates
+   /mnt/camera/camera_objects/objects0.dat (the cubes that the other files place randomly) and objects1.dat ...
+   objects10.dat.
+
+   Fisheye, set in configs/general.ini:
+
+       cameraImageOutputDirectory=/mnt/camera/fisheye
+       cameraObjectsFile=cameraobjects_elp.ini
+       objectsFile=objects1.dat
+
+   and run the same command:
+
+       python3 tools/genobjects.py 1 10
+
+   It creates the same files to /mnt/camera/fisheye/camera_objects: the same number always gives the same file,
+   so objects1.dat is the same scene for both lenses and their pictures can be compared. The directories are
+   created when they are missing.
+4. Open the creator:
+
+       ./prj-camera-image-creator
+
+   It opens the objects file of objectsFile (objects1.dat above) from the camera_objects directory of
+   cameraImageOutputDirectory, with the cameras of cameraObjectsFile, so with the fisheye settings of step 3 it opens
+   /mnt/camera/fisheye/camera_objects/objects1.dat with the fisheye cameras, and with the non-fisheye settings
+   /mnt/camera/camera_objects/objects1.dat with the IDS cameras.
+
+   To open another created objects file, give it on the command line, for example objects5.dat of the same
+   directory:
+
+       ./prj-camera-image-creator --objectsFile=objects5.dat
+
+   or change objectsFile in configs/general.ini. Close the creator and open it again for every objects file: one
+   window shows one objects file. To change between fisheye and non-fisheye, change cameraImageOutputDirectory and
+   cameraObjectsFile in configs/general.ini as in step 3 and open the creator again.
+
+   The window shows the scene from the base camera. Keys 1-6 show the view of that camera,
+   key 0 goes back to the base camera, the arrow keys turn the view, the mouse wheel moves it and key 'c' shows or hides
+   the camera objects.
+5. Press a key to save the pictures of all cameras:
+   - 's' saves the picture (png) and the data file (.dat, the correct distance of every pixel) of every camera,
+     these are the training images of prj-camera-image-learner,
+   - 'a' saves only the pictures (png), without the data files.
+
+   The files go to `<cameraImageOutputDirectory>/camera_output`, named
+   `<objects file name>_<timestamp>_<camera number>.png` (and `.dat`), for example
+   `objects1_20261108-092717_1.png` ... `objects1_20261108-092717_6.png`. The saved pictures never have the camera
+   objects.
+
+The 6 pictures of one save are one scene: prj-camera-image-viewer shows it with `--scene=objects1_20261108-092717`.
+Many scenes at once: tools/genobjects.py and tools/takepictures.py (see Tools below), or
+`prj-camera-image-creator --takePictures` (next section) for one scene without pressing keys.
+
 # Taking pictures
     prj-camera-image-creator --takePictures
 
