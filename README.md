@@ -40,7 +40,7 @@ sudo ldconfig
 test: pkg-config --modversion opencv4
 
 # Directories
-cameraImageOutputDirectory of configs/general.ini (/mnt/camera) has two directories:
+cameraImageOutputDirectory of configs/general.ini (/mnt/cameras) has two directories:
 - `<cameraImageOutputDirectory>/camera_output` (output directory): the saved pictures and data files,
 - `<cameraImageOutputDirectory>/camera_objects` (objects directory): the objects files (cubes and lights), objects0.dat
   has the cubes that tools/genobjects.py places.
@@ -66,11 +66,11 @@ if it cannot be created, they print `Could not create directory <directory>`.
    configs/general.ini. The objects files do not depend on the lens: genobjects.py places the cubes around the
    camera positions of configs/cameraobjects.ini, which are the same in all three camera files. Keep the fisheye
    and the non-fisheye pictures in their own cameraImageOutputDirectory, so they do not mix in one camera_output.
-   Example when /mnt/camera is empty:
+   Example when /mnt/cameras is empty:
 
    Non-fisheye, set in configs/general.ini:
 
-       cameraImageOutputDirectory=/mnt/camera
+       cameraImageOutputDirectory=/mnt/cameras
        cameraObjectsFile=cameraobjects_ids.ini
        objectsFile=objects1.dat
 
@@ -79,12 +79,12 @@ if it cannot be created, they print `Could not create directory <directory>`.
        python3 tools/genobjects.py 1 10
 
    It prints `objects0.dat (it was missing)` and `objects1.dat` ... `objects10.dat`, and creates
-   /mnt/camera/camera_objects/objects0.dat (the cubes that the other files place randomly) and objects1.dat ...
+   /mnt/cameras/camera_objects/objects0.dat (the cubes that the other files place randomly) and objects1.dat ...
    objects10.dat.
 
    Fisheye, set in configs/general.ini:
 
-       cameraImageOutputDirectory=/mnt/camera/fisheye
+       cameraImageOutputDirectory=/mnt/cameras/fisheye
        cameraObjectsFile=cameraobjects_elp.ini
        objectsFile=objects1.dat
 
@@ -92,7 +92,7 @@ if it cannot be created, they print `Could not create directory <directory>`.
 
        python3 tools/genobjects.py 1 10
 
-   It creates the same files to /mnt/camera/fisheye/camera_objects: the same number always gives the same file,
+   It creates the same files to /mnt/cameras/fisheye/camera_objects: the same number always gives the same file,
    so objects1.dat is the same scene for both lenses and their pictures can be compared. The directories are
    created when they are missing.
 4. Open the creator:
@@ -101,8 +101,8 @@ if it cannot be created, they print `Could not create directory <directory>`.
 
    It opens the objects file of objectsFile (objects1.dat above) from the camera_objects directory of
    cameraImageOutputDirectory, with the cameras of cameraObjectsFile, so with the fisheye settings of step 3 it opens
-   /mnt/camera/fisheye/camera_objects/objects1.dat with the fisheye cameras, and with the non-fisheye settings
-   /mnt/camera/camera_objects/objects1.dat with the IDS cameras.
+   /mnt/cameras/fisheye/camera_objects/objects1.dat with the fisheye cameras, and with the non-fisheye settings
+   /mnt/cameras/camera_objects/objects1.dat with the IDS cameras.
 
    To open another created objects file, give it on the command line, for example objects5.dat of the same
    directory:
