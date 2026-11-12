@@ -1,0 +1,54 @@
+# example objects file with all 4 object types: Cube, Ball, Cylinder and Cone, 10 objects around the cameras
+# (cameraObjectPosition<number> of configs/cameraobjects.ini), every one touches the floor, is at least 1 m from the
+# cameras and is seen from 0/1000/0. Open it with:
+#     cp examples/objects_shapes.dat <cameraImageOutputDirectory>/camera_objects/
+#     ./prj-camera-image-creator --objectsFile=objects_shapes.dat
+#
+# All types have the same values x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture: center x/y/z and sizes in mm
+# (2000 = 2.0), yaw/pitch/roll in degrees, texture image of the images folder.
+# Cube: the box of the sizes.
+# Ball: the ellipsoid inside the cube of the same values, the sizes are its diameters.
+# Cylinder: inside the cube, its axis is the y axis of the cube (sizeY is its height), sizeX and sizeZ are the
+# diameters of its ends.
+# Cone: inside the cube, its base (diameters sizeX and sizeZ) is at the bottom of the cube (-y) and its tip at the
+# middle of the top (+y).
+
+# cube, upright, in front of camera 1
+Cube=0.0/500.0/3500.0/1000.0/1000.0/1000.0/30.0/0.0/0.0/wood1.png
+
+# round ball
+Ball=2200.0/500.0/3200.0/1000.0/1000.0/1000.0/0.0/0.0/0.0/wood3.png
+
+# standing cylinder
+Cylinder=-2200.0/600.0/3200.0/800.0/1200.0/800.0/0.0/0.0/0.0/brick1.png
+
+# standing cone, tip up
+Cone=3800.0/700.0/1200.0/1000.0/1400.0/1000.0/0.0/0.0/0.0/wood5.png
+
+# flat egg-shaped ball (ellipsoid)
+Ball=3800.0/350.0/-1500.0/1400.0/700.0/900.0/40.0/0.0/0.0/brick2.png
+
+# cylinder lying on its side
+Cylinder=3000.0/350.0/-4200.0/700.0/1500.0/700.0/0.0/90.0/0.0/wood2.png
+
+# turned and tilted cube
+Cube=0.0/519.3/-5000.0/1400.0/600.0/900.0/20.0/15.0/10.0/brick1.png
+
+# cone lying on its side (pitch 90 + its half angle 19.1, so the side is on the floor)
+Cone=-3000.0/212.7/-4200.0/900.0/1300.0/900.0/0.0/109.1/0.0/wood4.png
+
+# low cylinder with elliptic ends
+Cylinder=-3800.0/250.0/-1500.0/1200.0/500.0/700.0/60.0/0.0/0.0/wood6.png
+
+# upside down cone, tip on the floor
+Cone=-3800.0/600.0/1200.0/1000.0/1200.0/1000.0/0.0/180.0/0.0/brick2.png
+
+# Spot light (x/y/z/directionX/directionY/directionZ/InnerAngle/OuterAngle/R/G/B)
+# position values in mm, 3000=3.0f, direction is where the light points to (any length),
+# InnerAngle/OuterAngle in degrees from the direction: full light inside InnerAngle, no light outside OuterAngle,
+# R/G/B color of the light (1.0/1.0/1.0 = white), there can be many SpotLight lines (max 8 are used)
+SpotLight=0.0/7000.0/0.0/0.0000/-1.0000/0.0000/60.0/75.0/0.7/0.7/0.7
+SpotLight=6000.0/5000.0/6000.0/-0.6092/-0.5077/-0.6092/30.0/45.0/1.0/1.0/1.0
+
+# Ambient light R/G/B, it lights everything evenly (optional, default 0.25/0.25/0.25)
+AmbientLight=0.2/0.2/0.2

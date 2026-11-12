@@ -2,7 +2,9 @@
 """Generates objects<first>.dat ... objects<last>.dat into <cameraImageOutputDirectory>/camera_objects
 (cameraImageOutputDirectory of configs/general.ini):
 usage genobjects.py <first> <last>
-Cubes of objects0.dat are placed randomly, 1-3 random spot lights, random ambient light.
+Cubes of objects0.dat are placed randomly, every one as a cube, a ball (the ellipsoid of the same size), a cylinder
+or a cone (of the same size, their axis is the y axis of the cube), each with the chance 1/4, 1-3 random spot
+lights, random ambient light.
 If objects0.dat is missing, it is created first: 9 random cubes in each of the 4 corners (-x/-z, +x/-z, -x/+z, +x/+z),
 1-5 random spot lights and random ambient light."""
 import math, random, re, sys
@@ -24,6 +26,10 @@ LIGHT_AREA = 15000.0
 NUDGE = 2.0                         # mm, sample points are this far outside of the face
 SAMPLE_GRID = 7                     # points per side on every face
 SINK_RATE = 0.25                    # cube can sink at most this part of its height under the floor
+SHAPES = ['Cube', 'Ball', 'Cylinder', 'Cone']   # an object of objects<number>.dat is each of these with the same chance
+BALL_SAMPLE_SEGMENTS = 24           # sample points around the ball, the cylinder and the cone
+BALL_SAMPLE_RINGS = 12              # sample points from the bottom to the top of the ball and the side of the cylinder
+                                    # and the cone
 # objects0.dat when it is missing: cubes in every corner, cube side lengths in mm, textures of the images folder
 BASE_CUBES_PER_CORNER = 9
 BASE_CUBE_SIZE = (300.0, 1500.0)
@@ -33,6 +39,11 @@ BASE_SEED = 'objects0'              # objects0.dat is always the same
 
 HEADER = """# Position of cube (x/y/z/SizeX/SizeY/SizeZ/Yaw/Pitch/Roll/wood.png)
 # in Cube, center position=x,y,z, size=sizeX,sizeY,SizeZ values mm, 2000=2.0f, Yaw/Pitch/Roll angle in degrees, and finally texture image as text string in images folder
+# Ball has the same values, it is the ellipsoid inside the cube of the same values (sizeX/sizeY/sizeZ are its diameters)
+# Cylinder has the same values, it is inside the cube of the same values, its axis is the y axis of the cube (sizeY
+# is its height) and its ends are the ellipses of the diameters sizeX and sizeZ
+# Cone has the same values, it is inside the cube of the same values, its base is the ellipse of the diameters sizeX
+# and sizeZ at the bottom of the cube (-y) and its tip at the middle of the top of the cube (+y)
 """
 LIGHT_HEADER = """
 # Spot light (x/y/z/directionX/directionY/directionZ/InnerAngle/OuterAngle/R/G/B)
@@ -134,6 +145,184 @@ class Box:
                         if w[1] >= 0.0:
                             points.append(w)
         return points
+
+
+class Ellipsoid(Box):
+    """Ball as in Cube::init(): the ellipsoid of the semi-axes h inside the box, rotated like the box."""
+    def __init__(self, center, size, yaw, pitch, roll):
+        super().__init__(center, size, yaw, pitch, roll)
+        self.radius = max(self.h)
+
+    def lowest_offset(self):
+        return -self.highest_offset()
+
+    def highest_offset(self):
+        return math.sqrt(sum((self.axes[i][1]*self.h[i])**2 for i in range(3)))
+
+    def distance(self, p):
+        """at most the distance to the ellipsoid, so the cameras are at least this far"""
+        return max(0.0, math.dist(p, self.c) - self.radius)
+
+    def hit(self, a, b):
+        """segment a-b goes through the ellipsoid (the unit sphere in the scaled local coordinates)"""
+        la = [v/self.h[i] for i, v in enumerate(self.to_local(a))]
+        lb = [v/self.h[i] for i, v in enumerate(self.to_local(b))]
+        d = [lb[i] - la[i] for i in range(3)]
+        length2 = dot(d, d)
+        t = 0.0 if length2 == 0 else max(0.0, min(1.0, -dot(la, d)/length2))
+        closest = [la[i] + d[i]*t for i in range(3)]
+        return dot(closest, closest) <= 1.0
+
+    def face_samples(self, viewer):
+        """points just outside of the surface that faces the viewer"""
+        points = []
+        for ring in range(BALL_SAMPLE_RINGS):
+            up = math.pi*(ring + 0.5)/BALL_SAMPLE_RINGS
+            for segment in range(BALL_SAMPLE_SEGMENTS):
+                around = 2.0*math.pi*(segment + 0.5)/BALL_SAMPLE_SEGMENTS
+                l = (self.h[0]*math.sin(up)*math.sin(around), -self.h[1]*math.cos(up),
+                     self.h[2]*math.sin(up)*math.cos(around))
+                g = [l[i]/(self.h[i]*self.h[i]) for i in range(3)]
+                n = tuple(sum(g[j]*self.axes[j][k] for j in range(3)) for k in range(3))
+                length = math.sqrt(dot(n, n))
+                n = tuple(v/length for v in n)
+                w = self.to_world(l)
+                if dot(n, sub(viewer, w)) <= 0.0:
+                    continue
+                w = tuple(w[k] + n[k]*NUDGE for k in range(3))
+                if w[1] >= 0.0:
+                    points.append(w)
+        return points
+
+
+class Cylinder(Box):
+    """Cylinder as in Cube::init(): inside the box, its axis is the y axis of the box, its ends are the ellipses of
+    the semi-axes h[0] and h[2]"""
+    def __init__(self, center, size, yaw, pitch, roll):
+        super().__init__(center, size, yaw, pitch, roll)
+        self.radius = math.sqrt(max(self.h[0], self.h[2])**2 + self.h[1]**2)
+
+    def lowest_offset(self):
+        return -self.highest_offset()
+
+    def highest_offset(self):
+        return abs(self.axes[1][1])*self.h[1] + math.sqrt((self.axes[0][1]*self.h[0])**2 + (self.axes[2][1]*self.h[2])**2)
+
+    def distance(self, p):
+        """at most the distance to the cylinder, so the cameras are at least this far"""
+        return max(0.0, math.dist(p, self.c) - self.radius)
+
+    def hit(self, a, b):
+        """segment a-b goes through the cylinder (the unit circle in the scaled local x/z, |y| <= h[1])"""
+        la, lb = self.to_local(a), self.to_local(b)
+        tmin, tmax = 0.0, 1.0
+        dy = lb[1] - la[1]
+        if abs(dy) < 1e-12:
+            if abs(la[1]) > self.h[1]:
+                return False
+        else:
+            t1, t2 = (-self.h[1] - la[1])/dy, (self.h[1] - la[1])/dy
+            tmin, tmax = max(tmin, min(t1, t2)), min(tmax, max(t1, t2))
+            if tmin > tmax:
+                return False
+        # nearest point to the axis on the part of the segment inside the ends
+        px, pz = la[0]/self.h[0], la[2]/self.h[2]
+        dx, dz = (lb[0] - la[0])/self.h[0], (lb[2] - la[2])/self.h[2]
+        length2 = dx*dx + dz*dz
+        t = tmin if length2 == 0 else max(tmin, min(tmax, -(px*dx + pz*dz)/length2))
+        return (px + dx*t)**2 + (pz + dz*t)**2 <= 1.0
+
+    def face_samples(self, viewer):
+        """points just outside of the side and the ends that face the viewer"""
+        candidates = []
+        for ring in range(BALL_SAMPLE_RINGS):
+            y = (-1 + 2*(ring + .5)/BALL_SAMPLE_RINGS)*self.h[1]
+            for segment in range(BALL_SAMPLE_SEGMENTS):
+                around = 2.0*math.pi*(segment + 0.5)/BALL_SAMPLE_SEGMENTS
+                candidates.append(((self.h[0]*math.sin(around), y, self.h[2]*math.cos(around)),
+                                   (math.sin(around)/self.h[0], 0.0, math.cos(around)/self.h[2])))
+        for s in (-1, 1):
+            for i in range(SAMPLE_GRID):
+                for j in range(SAMPLE_GRID):
+                    u, v = -1 + 2*(i + .5)/SAMPLE_GRID, -1 + 2*(j + .5)/SAMPLE_GRID
+                    if u*u + v*v <= 1.0:
+                        candidates.append(((u*self.h[0], s*self.h[1], v*self.h[2]), (0.0, s, 0.0)))
+        return self.facing_points(candidates, viewer)
+
+    def facing_points(self, candidates, viewer):
+        """the candidates (local point, local gradient) that face the viewer, just outside of the surface"""
+        points = []
+        for l, g in candidates:
+            n = tuple(sum(g[j]*self.axes[j][k] for j in range(3)) for k in range(3))
+            length = math.sqrt(dot(n, n))
+            n = tuple(v/length for v in n)
+            w = self.to_world(l)
+            if dot(n, sub(viewer, w)) <= 0.0:
+                continue
+            w = tuple(w[k] + n[k]*NUDGE for k in range(3))
+            if w[1] >= 0.0:
+                points.append(w)
+        return points
+
+
+class Cone(Cylinder):
+    """Cone as in Cube::init(): inside the box, its base is the ellipse of the semi-axes h[0] and h[2] at local
+    y = -h[1] and its tip at local y = h[1]"""
+    def lowest_offset(self):
+        rim = math.sqrt((self.axes[0][1]*self.h[0])**2 + (self.axes[2][1]*self.h[2])**2)
+        return min(self.axes[1][1]*self.h[1], -self.axes[1][1]*self.h[1] - rim)
+
+    def highest_offset(self):
+        rim = math.sqrt((self.axes[0][1]*self.h[0])**2 + (self.axes[2][1]*self.h[2])**2)
+        return max(self.axes[1][1]*self.h[1], -self.axes[1][1]*self.h[1] + rim)
+
+    def inside_value(self, l):
+        """negative or 0 inside of the cone (between the base and the tip): (x/h0)^2 + (z/h2)^2 - ((h1 - y)/2h1)^2"""
+        return (l[0]/self.h[0])**2 + (l[2]/self.h[2])**2 - ((self.h[1] - l[1])/(2.0*self.h[1]))**2
+
+    def hit(self, a, b):
+        """segment a-b goes through the cone: the smallest inside_value() on the part of the segment between the base
+        and the tip is at an end of the part or at the vertex of the quadratic"""
+        la, lb = self.to_local(a), self.to_local(b)
+        tmin, tmax = 0.0, 1.0
+        dy = lb[1] - la[1]
+        if abs(dy) < 1e-12:
+            if abs(la[1]) > self.h[1]:
+                return False
+        else:
+            t1, t2 = (-self.h[1] - la[1])/dy, (self.h[1] - la[1])/dy
+            tmin, tmax = max(tmin, min(t1, t2)), min(tmax, max(t1, t2))
+            if tmin > tmax:
+                return False
+        point = lambda t: tuple(la[i] + (lb[i] - la[i])*t for i in range(3))
+        values = [self.inside_value(point(tmin)), self.inside_value(point(tmax))]
+        # inside_value along the segment is q2*t^2 + q1*t + q0, the vertex is at -q1/(2*q2)
+        f0, fm, f1 = self.inside_value(point(0.0)), self.inside_value(point(0.5)), self.inside_value(point(1.0))
+        q2 = 2.0*(f1 - 2.0*fm + f0)
+        q1 = f1 - f0 - q2
+        if q2 > 0.0:
+            t = -q1/(2.0*q2)
+            if tmin < t < tmax:
+                values.append(self.inside_value(point(t)))
+        return min(values) <= 0.0
+
+    def face_samples(self, viewer):
+        """points just outside of the side and the base that face the viewer"""
+        height = 2.0*self.h[1]
+        candidates = []
+        for ring in range(BALL_SAMPLE_RINGS):
+            u = (ring + .5)/BALL_SAMPLE_RINGS          # 0 at the base, 1 at the tip
+            y = -self.h[1] + u*height
+            for segment in range(BALL_SAMPLE_SEGMENTS):
+                around = 2.0*math.pi*(segment + 0.5)/BALL_SAMPLE_SEGMENTS
+                candidates.append((((1 - u)*self.h[0]*math.sin(around), y, (1 - u)*self.h[2]*math.cos(around)),
+                                   (math.sin(around)/self.h[0], 1.0/height, math.cos(around)/self.h[2])))
+        for i in range(SAMPLE_GRID):
+            for j in range(SAMPLE_GRID):
+                u, v = -1 + 2*(i + .5)/SAMPLE_GRID, -1 + 2*(j + .5)/SAMPLE_GRID
+                if u*u + v*v <= 1.0:
+                    candidates.append(((u*self.h[0], -self.h[1], v*self.h[2]), (0.0, -1.0, 0.0)))
+        return self.facing_points(candidates, viewer)
 
 
 def blocked(a, b, boxes):
@@ -279,8 +468,9 @@ def read_base_cubes(objects_directory):
     return cubes
 
 
-def place_cubes(rng, base, cameras):
-    """random place, yaw, pitch and roll for every cube, all seen from the eye"""
+def place_cubes(rng, base, cameras, shapes):
+    """random place, yaw, pitch and roll for every cube, all seen from the eye, shapes[index] is the shape of the
+    cube (SHAPES)"""
     placed = []     # (box, params, visible sample points, sample count)
     order = sorted(range(len(base)), key=lambda i: -max(base[i][0]))   # big cubes first
     result = [None]*len(base)
@@ -292,12 +482,13 @@ def place_cubes(rng, base, cameras):
             distance = rng.uniform(MIN_CUBE_DISTANCE, MAX_CUBE_DISTANCE)
             x = round(distance*math.sin(angle), -1)
             z = round(distance*math.cos(angle), -1)
-            box0 = Box((0.0, 0.0, 0.0), size, yaw, pitch, roll)
-            # lowest corner is at the floor or sinks partly under it, so the cube always touches the floor
+            shape = {'Cube': Box, 'Ball': Ellipsoid, 'Cylinder': Cylinder, 'Cone': Cone}[shapes[index]]
+            box0 = shape((0.0, 0.0, 0.0), size, yaw, pitch, roll)
+            # lowest point is at the floor or sinks partly under it, so the cube or ball always touches the floor
             extent = box0.highest_offset() - box0.lowest_offset()
             sink = rng.uniform(0.0, SINK_RATE)*extent
             y = math.floor((-box0.lowest_offset() - sink)*10.0)/10.0
-            box = Box((x, y, z), size, yaw, pitch, roll)
+            box = shape((x, y, z), size, yaw, pitch, roll)
             if any(box.distance(c) < MIN_CAMERA_DISTANCE for c in cameras):
                 continue
             if any(math.dist(box.c, o[0].c) < box.radius + o[0].radius + CUBE_GAP for o in placed):
@@ -318,7 +509,7 @@ def place_cubes(rng, base, cameras):
             if not ok:
                 continue
             placed = [(o[0], o[1], filtered[i], o[3]) for i, o in enumerate(placed)]
-            placed.append((box, (x, y, z, size, yaw, pitch, roll, texture), visible, len(samples)))
+            placed.append((box, (shapes[index], x, y, z, size, yaw, pitch, roll, texture), visible, len(samples)))
             result[index] = placed[-1]
             break
         else:
@@ -344,8 +535,11 @@ def random_light(rng, boxes):
 
 def generate(number, cameras, base):
     rng = random.Random(number)
+    # own random numbers for the shapes, so the shapes depend only on the file number
+    shape_rng = random.Random('shapes%d' % number)
+    shapes = [shape_rng.choice(SHAPES) for _ in base]
     while True:
-        placed = place_cubes(rng, base, cameras)
+        placed = place_cubes(rng, base, cameras, shapes)
         if not placed:
             continue
         params, boxes = placed
@@ -358,9 +552,9 @@ def generate(number, cameras, base):
         else:
             break
     ambient = round(rng.uniform(MIN_AMBIENT, MAX_AMBIENT), 2)
-    text = '# objects%d.dat, random cubes and spot lights\n' % number + HEADER
-    for x, y, z, size, yaw, pitch, roll, texture in params:
-        text += 'Cube=%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%s\n' % (x, y, z, *size, yaw, pitch, roll, texture)
+    text = '# objects%d.dat, random cubes, balls, cylinders, cones and spot lights\n' % number + HEADER
+    for shape, x, y, z, size, yaw, pitch, roll, texture in params:
+        text += '%s=%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%s\n' % (shape, x, y, z, *size, yaw, pitch, roll, texture)
     text += LIGHT_HEADER
     for pos, d in lights:
         text += 'SpotLight=%.1f/%.1f/%.1f/%.4f/%.4f/%.4f/%.1f/%.1f/1.0/1.0/1.0\n' % (*pos, *d, LIGHT_INNER, LIGHT_OUTER)

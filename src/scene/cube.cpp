@@ -11,6 +11,20 @@ TgApplication *getApplication();
 #define IMAGES_PATH         "images/"
 #endif
 
+// ball: triangles around the ball and from the bottom to the top, the edge of the ball is at most
+// 1 - cos(pi/BALL_SEGMENTS) = 0.12% of its radius inside the real ellipsoid
+#define BALL_SEGMENTS       64
+#define BALL_RINGS          32
+// the texture is on the ball this many times around and from the bottom to the top, so a texel is about as large as
+// on a cube of the same size, the texture coordinates stay in 0..1 like on the cube faces
+#define BALL_TEXTURES_AROUND    4
+#define BALL_TEXTURES_UP        2
+// cylinder: side quads around it (the same edge accuracy as the ball), the texture is BALL_TEXTURES_AROUND times
+// around the side and once from the bottom to the top, the ends have it once like a cube face
+#define CYLINDER_SEGMENTS       64
+// cone: triangles from the base to the tip around it, the texture like on the cylinder
+#define CONE_SEGMENTS           64
+
 struct CubeVertice
 {
     float x, y, z;
@@ -39,7 +53,9 @@ Cube::~Cube()
 
 /*!
  * \brief Cube::setup
- * \param config center position, size, yaw/pitch/roll and texture of the cube
+ * \param config center position, size, yaw/pitch/roll and texture of the cube, or of the ball (ellipsoid inside
+ * the cube), the cylinder or the cone (inside the cube, their axis is the y axis of the cube, the tip of the cone is
+ * at the top)
  */
 void Cube::setup(const CubeConfig &config)
 {
@@ -61,7 +77,18 @@ int Cube::init()
     const VECTOR3 &position = m_config.position;
     std::vector<CubeVertice> listVertices;
 
-    // rotates roll first, then pitch and yaw, and moves to the position
+    // rotates roll first, then pitch and yaw (the normals of the ball, the cylinder and the cone)
+    auto rotate = [=](const float c[3], float out[3]) {
+        const float rollX = c[0]*cosf(roll) + c[1]*sinf(roll);
+        const float rollY = -c[0]*sinf(roll) + c[1]*cosf(roll);
+        const float pitchY = rollY*cosf(pitch) + c[2]*sinf(pitch);
+        const float pitchZ = -rollY*sinf(pitch) + c[2]*cosf(pitch);
+        out[0] = rollX*cosf(yaw) + pitchZ*sinf(yaw);
+        out[1] = pitchY;
+        out[2] = -rollX*sinf(yaw) + pitchZ*cosf(yaw);
+    };
+    // rotates roll first, then pitch and yaw, and moves to the position (the same additions as before the balls, so
+    // the cubes do not change)
     auto transform = [=](const float c[3], float out[3]) {
         const float rollX = c[0]*cosf(roll) + c[1]*sinf(roll);
         const float rollY = -c[0]*sinf(roll) + c[1]*cosf(roll);
@@ -98,12 +125,124 @@ int Cube::init()
     const float right[4][3]  = { {x1, y0, z1}, {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1} };
     const float top[4][3]    = { {x0, y1, z0}, {x0, y1, z1}, {x1, y1, z1}, {x1, y1, z0} };
     const float bottom[4][3] = { {x0, y0, z1}, {x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1} };
-    addFace(front);
-    addFace(back);
-    addFace(left);
-    addFace(right);
-    addFace(top);
-    addFace(bottom);
+    // ball: the ellipsoid of the semi-axes x1/y1/z1, a point of the sphere angles (ring from the bottom, segment around)
+    // with its normal (gradient of the ellipsoid) and the texture coordinate inside its texture copy
+    auto addBallPoint = [&](int ring, int segment, int ringBase, int segmentBase) {
+        const float up = static_cast<float>(ring)*PI_VALUE/BALL_RINGS;
+        const float around = static_cast<float>(segment)*2.0f*PI_VALUE/BALL_SEGMENTS;
+        const float local[3] = { x1*sinf(up)*sinf(around), -y1*cosf(up), z1*sinf(up)*cosf(around) };
+        const float gradient[3] = { local[0]/(x1*x1), local[1]/(y1*y1), local[2]/(z1*z1) };
+        float c[3], n[3];
+        transform(local, c);
+        rotate(gradient, n);
+        const float len = sqrtf(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+        const float s = static_cast<float>(segment - segmentBase)*BALL_TEXTURES_AROUND/BALL_SEGMENTS;
+        const float t = static_cast<float>(ring - ringBase)*BALL_TEXTURES_UP/BALL_RINGS;
+        listVertices.push_back( { c[0], c[1], c[2], n[0]/len, n[1]/len, n[2]/len, s, t, 1.0f, 1.0f, 1.0f, 1.0f } );
+    };
+    // cylinder: a point of its side at the angle of the segment and the height y with the normal of the side
+    // (gradient of the ellipse) or with the normal of its end (endNormal -1 bottom, 1 top)
+    auto addCylinderPoint = [&](int segment, float y, float s, float t, float endNormal) {
+        const float around = static_cast<float>(segment)*2.0f*PI_VALUE/CYLINDER_SEGMENTS;
+        const float local[3] = { x1*sinf(around), y, z1*cosf(around) };
+        const float side[3] = { sinf(around)/x1, 0.0f, cosf(around)/z1 };
+        const float end[3] = { 0.0f, endNormal, 0.0f };
+        float c[3], n[3];
+        transform(local, c);
+        rotate(endNormal != 0.0f ? end : side, n);
+        const float len = sqrtf(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+        listVertices.push_back( { c[0], c[1], c[2], n[0]/len, n[1]/len, n[2]/len, s, t, 1.0f, 1.0f, 1.0f, 1.0f } );
+    };
+    // center of an end of the cylinder
+    auto addCylinderCenter = [&](float y, float endNormal) {
+        const float local[3] = { 0.0f, y, 0.0f };
+        const float end[3] = { 0.0f, endNormal, 0.0f };
+        float c[3], n[3];
+        transform(local, c);
+        rotate(end, n);
+        listVertices.push_back( { c[0], c[1], c[2], n[0], n[1], n[2], 0.5f, 0.5f, 1.0f, 1.0f, 1.0f, 1.0f } );
+    };
+    // cone: a point of the base (y0) or the tip (y1) at the angle around (radians) with the normal of the side, the
+    // side is (x/x1)^2 + (z/z1)^2 = ((y1 - y)/height)^2 and its gradient is along (sin/x1, 1/height, cos/z1), or with
+    // the normal of the base (base true)
+    auto addConePoint = [&](float around, bool tip, float s, float t, bool base) {
+        const float height = y1 - y0;
+        const float local[3] = { tip ? 0.0f : x1*sinf(around), tip ? y1 : y0, tip ? 0.0f : z1*cosf(around) };
+        const float side[3] = { sinf(around)/x1, 1.0f/height, cosf(around)/z1 };
+        const float bottom[3] = { 0.0f, -1.0f, 0.0f };
+        float c[3], n[3];
+        transform(local, c);
+        rotate(base ? bottom : side, n);
+        const float len = sqrtf(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
+        listVertices.push_back( { c[0], c[1], c[2], n[0]/len, n[1]/len, n[2]/len, s, t, 1.0f, 1.0f, 1.0f, 1.0f } );
+    };
+    if (m_config.shape == ObjectShape::Cone) {
+        const int segmentsPerTexture = CONE_SEGMENTS/BALL_TEXTURES_AROUND;
+        for (int segment=0;segment<CONE_SEGMENTS;segment++) {
+            const int segmentBase = segment/segmentsPerTexture*segmentsPerTexture;
+            const float s0 = static_cast<float>(segment - segmentBase)*BALL_TEXTURES_AROUND/CONE_SEGMENTS;
+            const float s1 = static_cast<float>(segment + 1 - segmentBase)*BALL_TEXTURES_AROUND/CONE_SEGMENTS;
+            const float a0 = static_cast<float>(segment)*2.0f*PI_VALUE/CONE_SEGMENTS;
+            const float a1 = static_cast<float>(segment + 1)*2.0f*PI_VALUE/CONE_SEGMENTS;
+            // the tip has the normal of the middle of the triangle, so the side is smooth around the cone
+            addConePoint(a0, false, s0, 0.0f, false);
+            addConePoint(a1, false, s1, 0.0f, false);
+            addConePoint((a0 + a1)/2.0f, true, (s0 + s1)/2.0f, 1.0f, false);
+            // the base has the texture once, the ellipse inside the texture square
+            addCylinderCenter(y0, -1.0f);
+            addConePoint(a0, false, 0.5f + 0.5f*sinf(a0), 0.5f + 0.5f*cosf(a0), true);
+            addConePoint(a1, false, 0.5f + 0.5f*sinf(a1), 0.5f + 0.5f*cosf(a1), true);
+        }
+    } else if (m_config.shape == ObjectShape::Cylinder) {
+        const int segmentsPerTexture = CYLINDER_SEGMENTS/BALL_TEXTURES_AROUND;
+        for (int segment=0;segment<CYLINDER_SEGMENTS;segment++) {
+            const int segmentBase = segment/segmentsPerTexture*segmentsPerTexture;
+            const float s0 = static_cast<float>(segment - segmentBase)*BALL_TEXTURES_AROUND/CYLINDER_SEGMENTS;
+            const float s1 = static_cast<float>(segment + 1 - segmentBase)*BALL_TEXTURES_AROUND/CYLINDER_SEGMENTS;
+            addCylinderPoint(segment, y0, s0, 0.0f, 0.0f);
+            addCylinderPoint(segment + 1, y0, s1, 0.0f, 0.0f);
+            addCylinderPoint(segment + 1, y1, s1, 1.0f, 0.0f);
+            addCylinderPoint(segment, y0, s0, 0.0f, 0.0f);
+            addCylinderPoint(segment + 1, y1, s1, 1.0f, 0.0f);
+            addCylinderPoint(segment, y1, s0, 1.0f, 0.0f);
+            // the ends have the texture once, the ellipse inside the texture square
+            for (const float endNormal : { -1.0f, 1.0f }) {
+                const float y = endNormal < 0.0f ? y0 : y1;
+                const float a0 = static_cast<float>(segment)*2.0f*PI_VALUE/CYLINDER_SEGMENTS;
+                const float a1 = static_cast<float>(segment + 1)*2.0f*PI_VALUE/CYLINDER_SEGMENTS;
+                addCylinderCenter(y, endNormal);
+                addCylinderPoint(segment, y, 0.5f + 0.5f*sinf(a0), 0.5f + 0.5f*cosf(a0), endNormal);
+                addCylinderPoint(segment + 1, y, 0.5f + 0.5f*sinf(a1), 0.5f + 0.5f*cosf(a1), endNormal);
+            }
+        }
+    } else if (m_config.shape == ObjectShape::Ball) {
+        const int segmentsPerTexture = BALL_SEGMENTS/BALL_TEXTURES_AROUND;
+        const int ringsPerTexture = BALL_RINGS/BALL_TEXTURES_UP;
+        for (int ring=0;ring<BALL_RINGS;ring++) {
+            const int ringBase = ring/ringsPerTexture*ringsPerTexture;
+            for (int segment=0;segment<BALL_SEGMENTS;segment++) {
+                const int segmentBase = segment/segmentsPerTexture*segmentsPerTexture;
+                // the quad has a corner at the bottom and the top point, so it is one triangle there
+                if (ring > 0) {
+                    addBallPoint(ring, segment, ringBase, segmentBase);
+                    addBallPoint(ring, segment + 1, ringBase, segmentBase);
+                    addBallPoint(ring + 1, segment + 1, ringBase, segmentBase);
+                }
+                if (ring + 1 < BALL_RINGS) {
+                    addBallPoint(ring, segment, ringBase, segmentBase);
+                    addBallPoint(ring + 1, segment + 1, ringBase, segmentBase);
+                    addBallPoint(ring + 1, segment, ringBase, segmentBase);
+                }
+            }
+        }
+    } else {
+        addFace(front);
+        addFace(back);
+        addFace(left);
+        addFace(right);
+        addFace(top);
+        addFace(bottom);
+    }
 
     m_verticesCount = static_cast<int>(listVertices.size());
     glGenVertexArrays(1, &m_vertexArrayObject);

@@ -5,9 +5,20 @@
 #include <vector>
 #include "../math/math3d.h"
 
+// shapes of the objects, a ball and a cylinder fit into the cube of the same size
+enum class ObjectShape
+{
+    Cube,       // box
+    Ball,       // ellipsoid, the sizes are its diameters
+    Cylinder,   // its axis is the y axis of the cube, size y is its height and sizes x/z the diameters of its ends
+    Cone,       // its axis is the y axis of the cube, sizes x/z are the diameters of its base (bottom, -y) and the tip
+                // is at the top (+y) of the cube
+};
+
 struct CubeConfig
 {
-    VECTOR3 position = { 0.0f, 0.0f, 0.0f };    // center of the cube in opengl units
+    ObjectShape shape = ObjectShape::Cube;
+    VECTOR3 position = { 0.0f, 0.0f, 0.0f };    // center of the cube (also of a ball, cylinder or cone) in opengl units
     VECTOR3 size = { 1.0f, 1.0f, 1.0f };        // x/y/z size in opengl units
     float yaw = 0.0f;                           // degrees, positive turns the front (+z) to the right (+x)
     float pitch = 0.0f;                         // degrees, positive turns the front up
@@ -29,6 +40,15 @@ struct SpotLightConfig
  * Reads objects .dat file: key=value lines, lines starting with # are comments.
  * Every cube is written as Cube=x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture,
  * position and size are in mm (2000 = 2.0 in opengl units), angles in degrees.
+ * Every ball is written as Ball=x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture with the same values: the ball is
+ * the ellipsoid that fits into the cube of the same values (sizeX/sizeY/sizeZ are its diameters).
+ * Every cylinder is written as Cylinder=x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture with the same values: the
+ * cylinder fits into the cube of the same values, its axis is the y axis of the cube (sizeY is its height) and its
+ * ends are the ellipses of the diameters sizeX and sizeZ.
+ * Every cone is written as Cone=x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture with the same values: the cone fits
+ * into the cube of the same values, its base is the ellipse of the diameters sizeX and sizeZ at the bottom of the
+ * cube (-y) and its tip is at the middle of the top of the cube (+y), sizeY is its height.
+ * The list has the cubes first, then the balls, the cylinders and the cones.
  * Every spot light is written as
  * SpotLight=x/y/z/directionX/directionY/directionZ/innerAngle/outerAngle/r/g/b,
  * position is in mm, angles in degrees. AmbientLight=r/g/b is optional.

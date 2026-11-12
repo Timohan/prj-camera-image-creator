@@ -130,6 +130,14 @@ The 6 pictures of one save are one scene: prj-camera-image-viewer shows it with 
 Many scenes at once: tools/genobjects.py and tools/takepictures.py (see Tools below), or
 `prj-camera-image-creator --takePictures` (next section) for one scene without pressing keys.
 
+# Example objects file
+examples/objects_shapes.dat has all 4 object types (Cube, Ball, Cylinder and Cone), 10 objects around the cameras,
+upright and turned (a cylinder and a cone lie on their side, a cone is upside down on its tip), with comments on
+every line and on the values. Copy it to the objects directory and open it:
+
+    cp examples/objects_shapes.dat /mnt/cameras/camera_objects/
+    ./prj-camera-image-creator --objectsFile=objects_shapes.dat
+
 # Taking pictures
     prj-camera-image-creator --takePictures
 
@@ -208,14 +216,28 @@ For example `python3 tools/genobjects.py 1 99` writes objects1.dat ... objects99
 (existing files with the same names are overwritten).
 
 Every file has:
-- the cubes (sizes and textures) of objects0.dat, placed randomly around 0/0/0 at 1.5-15 m distance with random yaw, pitch and roll,
-  every cube touches the floor and can be partly under it, cubes do not overlap,
-- every cube is at least 1000 mm from the cameraObjectPosition<number> positions of configs/cameraobjects.ini,
-- every cube is visible from the position 0/1000/0 mm (at least 30% of its faces seen from there),
-- 1-3 white spot lights with random positions and directions, each lights at least 5 cubes,
+- the cubes (sizes and textures) of objects0.dat, every one randomly a cube (`Cube=`), a ball (`Ball=`), a
+  cylinder (`Cylinder=`) or a cone (`Cone=`), each with the chance 1/4 (SHAPES of the script), placed randomly around 0/0/0 at 1.5-15 m
+  distance with random yaw, pitch and roll, every object touches the floor and can be partly under it, they do not
+  overlap,
+- all four have the same values x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture: x/y/z is the center,
+  sizeX/sizeY/sizeZ the width, height and depth, yaw/pitch/roll turn it like a cube and the texture is one of the
+  wood and brick images of objects0.dat (images folder). A ball is the ellipsoid that fits into the cube of the same
+  values (the sizes are its diameters), a cylinder fits into it with its axis along the y axis of the cube (sizeY is
+  its height, sizeX and sizeZ the diameters of its elliptic ends) and a cone fits into it with its base (the
+  ellipse of the diameters sizeX and sizeZ) at the bottom of the cube (-y) and its tip at the middle of the top
+  (+y), for example
+  `Ball=7290.0/270.7/1310.0/1440.0/720.0/580.0/78.0/152.0/10.5/wood3.png`,
+  `Cylinder=-2610.0/271.5/-410.0/520.0/790.0/560.0/174.4/354.8/84.5/wood5.png` and
+  `Cone=-1350.0/418.0/1530.0/440.0/710.0/740.0/241.3/33.0/41.4/wood2.png`,
+- every object is at least 1000 mm from the cameraObjectPosition<number> positions of configs/cameraobjects.ini,
+- every object is visible from the position 0/1000/0 mm (at least 30% of its surface seen from there),
+- 1-3 white spot lights with random positions and directions, each lights at least 5 objects,
 - ambient light 0.1-0.5.
 
-The result depends only on the file number, so the same number always gives the same file.
+The result depends only on the file number, so the same number always gives the same file. Every object is one
+surface number in the data files: a cube has 6 flat faces, the normals of a ball change smoothly over it, a cylinder
+has a smooth side and 2 flat ends, a cone a smooth side and a flat base.
 Use a file with `objectsFile=objects1.dat` in configs/general.ini.
 
 If objects0.dat is missing from the objects directory, it is created first (and printed as

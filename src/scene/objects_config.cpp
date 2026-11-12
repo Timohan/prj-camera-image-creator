@@ -1,6 +1,7 @@
 #include "objects_config.h"
 #include "ini_file.h"
 #include "global_log.h"
+#include <utility>
 
 #define MM_TO_OPENGL_UNIT   1000.0f
 // x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll before the texture
@@ -24,27 +25,33 @@ bool ObjectsConfig::read(const std::string &filename)
     if (!ini.read(filename)) {
         return false;
     }
-    for (const std::string &value : ini.getValues("Cube")) {
-        CubeConfig cube;
-        float values[CUBE_VALUE_COUNT];
-        const size_t textureBegin = value.rfind('/');
+    const std::pair<const char *, ObjectShape> shapes[] = {
+        { "Cube", ObjectShape::Cube }, { "Ball", ObjectShape::Ball }, { "Cylinder", ObjectShape::Cylinder },
+        { "Cone", ObjectShape::Cone } };
+    for (const auto &[key, shape] : shapes) {
+        for (const std::string &value : ini.getValues(key)) {
+            CubeConfig cube;
+            float values[CUBE_VALUE_COUNT];
+            const size_t textureBegin = value.rfind('/');
 
-        if (textureBegin == std::string::npos
-            || !IniFile::parseFloats(value.substr(0, textureBegin), values, CUBE_VALUE_COUNT)) {
-            TG_ERROR_LOG(filename + ": Cube=" + value, "is invalid");
-            return false;
+            if (textureBegin == std::string::npos
+                || !IniFile::parseFloats(value.substr(0, textureBegin), values, CUBE_VALUE_COUNT)) {
+                TG_ERROR_LOG(filename + ": " + key + "=" + value, "is invalid");
+                return false;
+            }
+            cube.shape = shape;
+            cube.texture = value.substr(textureBegin + 1);
+            if (values[3] <= 0.0f || values[4] <= 0.0f || values[5] <= 0.0f || cube.texture.empty()) {
+                TG_ERROR_LOG(filename + ": " + key + "=" + value, "must have positive size and texture");
+                return false;
+            }
+            cube.position = { values[0]/MM_TO_OPENGL_UNIT, values[1]/MM_TO_OPENGL_UNIT, values[2]/MM_TO_OPENGL_UNIT };
+            cube.size = { values[3]/MM_TO_OPENGL_UNIT, values[4]/MM_TO_OPENGL_UNIT, values[5]/MM_TO_OPENGL_UNIT };
+            cube.yaw = values[6];
+            cube.pitch = values[7];
+            cube.roll = values[8];
+            listCube.push_back(cube);
         }
-        cube.texture = value.substr(textureBegin + 1);
-        if (values[3] <= 0.0f || values[4] <= 0.0f || values[5] <= 0.0f || cube.texture.empty()) {
-            TG_ERROR_LOG(filename + ": Cube=" + value, "must have positive size and texture");
-            return false;
-        }
-        cube.position = { values[0]/MM_TO_OPENGL_UNIT, values[1]/MM_TO_OPENGL_UNIT, values[2]/MM_TO_OPENGL_UNIT };
-        cube.size = { values[3]/MM_TO_OPENGL_UNIT, values[4]/MM_TO_OPENGL_UNIT, values[5]/MM_TO_OPENGL_UNIT };
-        cube.yaw = values[6];
-        cube.pitch = values[7];
-        cube.roll = values[8];
-        listCube.push_back(cube);
     }
     for (const std::string &value : ini.getValues("SpotLight")) {
         SpotLightConfig light;
