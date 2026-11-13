@@ -158,7 +158,7 @@ sizeY its height and sizeZ its length, its front is +z of the cube and its wheel
 The body has wheel arches, a hood, a cabin and a trunk or a tailgate. The texture is its paint (images/car_red.png,
 car_blue.png, car_silver.png, car_white.png and car_black.png), the windows, tires, rims, lights, grille, license
 plates and door handles have their own colors. A car is one surface number in the data files. The objects file lists
-the cars after the cones: the cars, the SUVs and then the sports cars. tools/genobjects.py does not make cars.
+the cars after the cones: the cars, the SUVs and then the sports cars. tools/genobjects.py places 0-30 random cars.
 
 examples/objects_people.dat has standing men (Man), women (Woman) and children (Child) around the cameras and a car
 next to them:
@@ -186,7 +186,7 @@ normal height, 5 cm bigger and 10 cm bigger) in 3 rows in front of camera 1:
 The example of the man stands 3 m in front of camera 1 and looks at it. The texture is the shirt (images/shirt_blue.png,
 shirt_red.png, shirt_white.png, shirt_green.png and shirt_gray.png), the people have hair, eyes, eyebrows, a nose, a
 mouth, ears, hands and shoes. A person is one surface number in the data files, the objects file lists the men, the
-women and then the children after the sports cars. tools/genobjects.py does not make people.
+women and then the children after the sports cars. tools/genobjects.py places 0-60 random people.
 
 # Taking pictures
     prj-camera-image-creator --takePictures
@@ -260,16 +260,17 @@ and moves the previous files back to the output directory.
 ## tools/genobjects.py
 Generates random objects files into the objects directory. Needs only Python 3.
 
-    python3 tools/genobjects.py <first> <last>
+    python3 tools/genobjects.py <first> <last> [--objectsDirectory=<directory>]
 
 For example `python3 tools/genobjects.py 1 99` writes objects1.dat ... objects99.dat of the objects directory
-(existing files with the same names are overwritten).
+(existing files with the same names are overwritten), `--objectsDirectory=<directory>` writes them into another
+directory instead (objects0.dat is read from there, or created there when it is missing).
 
 Every file has:
-- the cubes (sizes and textures) of objects0.dat, every one randomly a cube (`Cube=`), a ball (`Ball=`), a
-  cylinder (`Cylinder=`) or a cone (`Cone=`), each with the chance 1/4 (SHAPES of the script), placed randomly around 0/0/0 at 1.5-15 m
-  distance with random yaw, pitch and roll, every object touches the floor and can be partly under it, they do not
-  overlap,
+- the cubes (sizes and textures) of objects0.dat 3 times (108 objects, BASE_COPIES of the script), every one randomly a
+  cube (`Cube=`), a ball (`Ball=`), a cylinder (`Cylinder=`) or a cone (`Cone=`), each with the chance 1/4 (SHAPES of
+  the script), placed randomly around 0/0/0 at 1.5-30 m distance with random yaw, pitch and roll, every object touches the floor and can be partly under
+  it, they do not overlap,
 - all four have the same values x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture: x/y/z is the center,
   sizeX/sizeY/sizeZ the width, height and depth, yaw/pitch/roll turn it like a cube and the texture is one of the
   wood and brick images of objects0.dat (images folder). A ball is the ellipsoid that fits into the cube of the same
@@ -280,14 +281,26 @@ Every file has:
   `Ball=7290.0/270.7/1310.0/1440.0/720.0/580.0/78.0/152.0/10.5/wood3.png`,
   `Cylinder=-2610.0/271.5/-410.0/520.0/790.0/560.0/174.4/354.8/84.5/wood5.png` and
   `Cone=-1350.0/418.0/1530.0/440.0/710.0/740.0/241.3/33.0/41.4/wood2.png`,
+- 0-30 cars, each randomly a sedan (`Car=`), an SUV (`Suv=`) or a sports car (`SportCar=`) with the chance 1/3,
+  5 % smaller ... 5 % bigger than its normal size, a random paint (car_*.png), and 0-60 people, each randomly a man
+  (`Man=`), a woman (`Woman=`) or a child (`Child=`) with the chance 1/3, 10 cm smaller ... 10 cm bigger than the
+  normal height (all sizes scaled the same), a random shirt (shirt_*.png). They stand still on the floor (pitch and
+  roll 0) with a random heading (yaw), randomly around 0/0/0 at 1.5-30 m distance, for example
+  `Car=2140.0/707.2/-12130.0/1951.0/1414.5/4487.3/273.9/0.0/0.0/car_white.png` and
+  `Woman=1540.0/778.0/26570.0/462.1/1556.1/282.9/233.8/0.0/0.0/shirt_blue.png`,
+- nothing touches a car or a person: the cubes, balls, cylinders and cones are at least 10 cm from the cars and at
+  least 1 cm from the people, the people and the cars are at least 1 cm from each other (the distances are between
+  the boxes of the objects, so the real objects are at least this far),
 - every object is at least 1000 mm from the cameraObjectPosition<number> positions of configs/cameraobjects.ini,
-- every object is visible from the position 0/1000/0 mm (at least 30% of its surface seen from there),
-- 1-3 white spot lights with random positions and directions, each lights at least 5 objects,
+- every cube, ball, cylinder and cone is visible from the position 0/1000/0 mm (at least 30% of its surface seen from
+  there past the other cubes, balls, cylinders and cones),
+- 1-3 white spot lights with random positions and directions, each lights at least 5 cubes, balls, cylinders or
+  cones (the cars and the people cast shadows too),
 - ambient light 0.1-0.5.
 
 The result depends only on the file number, so the same number always gives the same file. Every object is one
 surface number in the data files: a cube has 6 flat faces, the normals of a ball change smoothly over it, a cylinder
-has a smooth side and 2 flat ends, a cone a smooth side and a flat base.
+has a smooth side and 2 flat ends, a cone a smooth side and a flat base, a car or a person is one surface too.
 Use a file with `objectsFile=objects1.dat` in configs/general.ini.
 
 If objects0.dat is missing from the objects directory, it is created first (and printed as

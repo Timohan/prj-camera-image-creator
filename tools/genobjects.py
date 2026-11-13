@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 """Generates objects<first>.dat ... objects<last>.dat into <cameraImageOutputDirectory>/camera_objects
-(cameraImageOutputDirectory of configs/general.ini):
-usage genobjects.py <first> <last>
-Cubes of objects0.dat are placed randomly, every one as a cube, a ball (the ellipsoid of the same size), a cylinder
-or a cone (of the same size, their axis is the y axis of the cube), each with the chance 1/4, 1-3 random spot
-lights, random ambient light.
+(cameraImageOutputDirectory of configs/general.ini) or into the directory of --objectsDirectory:
+usage genobjects.py <first> <last> [--objectsDirectory=<directory>]
+Every file has:
+- 0-60 people (Man, Woman or Child, each with the chance 1/3, 10 cm smaller ... 10 cm bigger than the normal
+  height, a random shirt) and 0-30 cars (Car, Suv or SportCar, each with the chance 1/3, 5 % smaller ... 5 % bigger,
+  a random paint), standing on the floor with a random heading, 1.5-30 m from 0/0/0. No other object touches a
+  person or a car: people and cars are at least 1 cm from each other.
+- the 36 cubes of objects0.dat 3 times (108 objects) placed randomly 1.5-30 m from 0/0/0, every one as a cube, a ball
+  (the ellipsoid of the same size), a cylinder or a cone (of the same size, their axis is the y axis of the cube),
+  each with the chance 1/4, with a random yaw, pitch and roll, at least 10 cm from the cars and 1 cm from the people.
+- 1-3 random spot lights and a random ambient light.
+The distances to the people and the cars are taken from their boxes (and the boxes of the cubes, balls, cylinders
+and cones), so the real objects are at least this far.
 If objects0.dat is missing, it is created first: 9 random cubes in each of the 4 corners (-x/-z, +x/-z, -x/+z, +x/+z),
 1-5 random spot lights and random ambient light."""
 import math, random, re, sys
@@ -16,7 +24,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EYE = (0.0, 1000.0, 0.0)            # 0/1/0 in opengl units, mm
 MIN_CAMERA_DISTANCE = 1000.0        # mm, from the cubes to cameraObjectPosition<number>
 MIN_AMBIENT, MAX_AMBIENT = 0.1, 0.5
-MIN_CUBE_DISTANCE, MAX_CUBE_DISTANCE = 1500.0, 15000.0
+MIN_CUBE_DISTANCE, MAX_CUBE_DISTANCE = 1500.0, 30000.0
+BASE_MAX_DISTANCE = 15000.0         # cubes of objects0.dat (their sizes and textures are used)
 CUBE_GAP = 300.0                    # mm between the bounding spheres of cubes
 MIN_VISIBLE = 0.3                   # part of the faces seen from the eye that must be seen
 LIGHT_MIN_CUBES = 5
@@ -36,6 +45,19 @@ BASE_CUBE_SIZE = (300.0, 1500.0)
 BASE_TEXTURES = ['wood1.png', 'wood2.png', 'wood3.png', 'wood4.png', 'wood5.png', 'wood6.png', 'brick1.png', 'brick2.png']
 BASE_LIGHTS = (1, 5)
 BASE_SEED = 'objects0'              # objects0.dat is always the same
+# people and cars: the count, the types with their normal box sizes (mm), the size changes and the textures
+PEOPLE = (0, 60)
+CARS = (0, 30)
+BASE_COPIES = 3                     # every cube of objects0.dat is placed this many times (108 objects)
+HUMAN_TYPES = [('Man', (560.0, 1800.0, 310.0)), ('Woman', (490.0, 1650.0, 300.0)), ('Child', (360.0, 1200.0, 215.0))]
+HUMAN_HEIGHT_CHANGE = 100.0         # mm, the height is the normal height +- this, all sizes are scaled the same
+SHIRTS = ['shirt_blue.png', 'shirt_red.png', 'shirt_white.png', 'shirt_green.png', 'shirt_gray.png']
+CAR_TYPES = [('Car', (2000.0, 1450.0, 4600.0)), ('Suv', (2100.0, 1750.0, 4700.0)),
+             ('SportCar', (2050.0, 1250.0, 4400.0))]
+CAR_SIZE_CHANGE = 0.05              # the sizes are the normal sizes scaled 1 +- this
+PAINTS = ['car_red.png', 'car_blue.png', 'car_silver.png', 'car_white.png', 'car_black.png']
+CAR_GAP = 100.0                     # mm, at least from a car to the cubes, balls, cylinders and cones
+PERSON_GAP = 10.0                   # mm, at least from a person to them and between the people and the cars
 
 HEADER = """# Position of cube (x/y/z/SizeX/SizeY/SizeZ/Yaw/Pitch/Roll/wood.png)
 # in Cube, center position=x,y,z, size=sizeX,sizeY,SizeZ values mm, 2000=2.0f, Yaw/Pitch/Roll angle in degrees, and finally texture image as text string in images folder
@@ -44,6 +66,10 @@ HEADER = """# Position of cube (x/y/z/SizeX/SizeY/SizeZ/Yaw/Pitch/Roll/wood.png)
 # is its height) and its ends are the ellipses of the diameters sizeX and sizeZ
 # Cone has the same values, it is inside the cube of the same values, its base is the ellipse of the diameters sizeX
 # and sizeZ at the bottom of the cube (-y) and its tip at the middle of the top of the cube (+y)
+# Car (sedan), Suv and SportCar have the same values, the car fits into the cube of the same values (sizeX is its
+# width with the side mirrors, sizeZ its length), its front is +z of the cube and its wheels are on the floor
+# Man, Woman and Child have the same values, the standing person fills the cube of the same values (sizeX is the width
+# from hand to hand, sizeY the height), the person looks toward +z of the cube and stands on the floor
 """
 LIGHT_HEADER = """
 # Spot light (x/y/z/directionX/directionY/directionZ/InnerAngle/OuterAngle/R/G/B)
@@ -325,12 +351,33 @@ class Cone(Cylinder):
         return self.facing_points(candidates, viewer)
 
 
+def cross(a, b):
+    return (a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0])
+
+
+def boxes_near(a, b, gap):
+    """the box of a (its cube) and the box of b grown by gap on every side overlap (separating axis test): False
+    means that the boxes are at least gap apart (the grown box contains every point nearer than gap to b)"""
+    hb = [v + gap for v in b.h]
+    t = sub(b.c, a.c)
+    axes = list(a.axes) + list(b.axes) + [cross(u, v) for u in a.axes for v in b.axes]
+    for axis in axes:
+        if dot(axis, axis) < 1e-9:
+            continue
+        ra = sum(a.h[i]*abs(dot(a.axes[i], axis)) for i in range(3))
+        rb = sum(hb[i]*abs(dot(b.axes[i], axis)) for i in range(3))
+        if abs(dot(t, axis)) > ra + rb:
+            return False
+    return True
+
+
 def blocked(a, b, boxes):
     return any(box.hit(a, b) for box in boxes)
 
 
-def light_touches(pos, direction, boxes, need=LIGHT_MIN_CUBES):
-    """cubes that have a lit point inside the inner cone, not in shadow of other cubes"""
+def light_touches(pos, direction, boxes, need=LIGHT_MIN_CUBES, blockers=None):
+    """cubes that have a lit point inside the inner cone, not in shadow of other cubes (or of the blockers)"""
+    blockers = boxes if blockers is None else blockers
     cos_inner = math.cos(math.radians(LIGHT_INNER))
     count = 0
     for box in boxes:
@@ -343,7 +390,7 @@ def light_touches(pos, direction, boxes, need=LIGHT_MIN_CUBES):
             continue
         for p in box.face_samples(pos):
             v = sub(p, pos)
-            if dot(v, direction)/math.sqrt(dot(v, v)) >= cos_inner and not blocked(pos, p, boxes):
+            if dot(v, direction)/math.sqrt(dot(v, v)) >= cos_inner and not blocked(pos, p, blockers):
                 count += 1
                 break
         if count >= need:
@@ -389,7 +436,7 @@ def place_corner_cube(rng, size, corner, placed, cameras):
     for _ in range(5000):
         yaw, pitch, roll = [round(rng.uniform(0, 360), 1) for _ in range(3)]
         angle = rng.uniform(0.0, math.pi/2.0)
-        distance = rng.uniform(MIN_CUBE_DISTANCE, MAX_CUBE_DISTANCE)
+        distance = rng.uniform(MIN_CUBE_DISTANCE, BASE_MAX_DISTANCE)
         x = round(corner[0]*distance*math.sin(angle), -1)
         z = round(corner[1]*distance*math.cos(angle), -1)
         box0 = Box((0.0, 0.0, 0.0), size, yaw, pitch, roll)
@@ -424,7 +471,7 @@ def generate_base(cameras):
                 lines.append('Cube=%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%s\n'
                              % (x, y, z, *size, yaw, pitch, roll, texture))
             else:
-                sections.append('\n# random cubes in %s area within %d m distance\n' % (name, MAX_CUBE_DISTANCE/1000.0)
+                sections.append('\n# random cubes in %s area within %d m distance\n' % (name, BASE_MAX_DISTANCE/1000.0)
                                 + ''.join(lines))
                 continue
             break
@@ -468,9 +515,43 @@ def read_base_cubes(objects_directory):
     return cubes
 
 
-def place_cubes(rng, base, cameras, shapes):
+def place_people_and_cars(rng, cameras):
+    """0-30 cars and 0-60 people standing on the floor with a random heading, at least PERSON_GAP from each other
+    (between their boxes), returns the lines of the objects file and the (box, gap to the cubes) of every one"""
+    lines, placed = [], []
+    wanted = [('car', i) for i in range(rng.randint(*CARS))] + [('person', i) for i in range(rng.randint(*PEOPLE))]
+    for kind, _ in wanted:
+        if kind == 'car':
+            name, normal = rng.choice(CAR_TYPES)
+            scale = rng.uniform(1.0 - CAR_SIZE_CHANGE, 1.0 + CAR_SIZE_CHANGE)
+            texture, gap = rng.choice(PAINTS), CAR_GAP
+        else:
+            name, normal = rng.choice(HUMAN_TYPES)
+            scale = (normal[1] + rng.uniform(-HUMAN_HEIGHT_CHANGE, HUMAN_HEIGHT_CHANGE))/normal[1]
+            texture, gap = rng.choice(SHIRTS), PERSON_GAP
+        size = tuple(round(v*scale, 1) for v in normal)
+        for _ in range(5000):
+            yaw = round(rng.uniform(0, 360), 1)
+            angle = rng.uniform(0, 2*math.pi)
+            distance = rng.uniform(MIN_CUBE_DISTANCE, MAX_CUBE_DISTANCE)
+            x = round(distance*math.sin(angle), -1)
+            z = round(distance*math.cos(angle), -1)
+            # standing on the floor: the bottom of the box is at y 0
+            box = Box((x, size[1]/2.0, z), size, yaw, 0.0, 0.0)
+            if any(box.distance(c) < MIN_CAMERA_DISTANCE for c in cameras):
+                continue
+            if any(boxes_near(box, o, PERSON_GAP) for o, _ in placed):
+                continue
+            placed.append((box, gap))
+            lines.append('%s=%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/0.0/0.0/%s\n'
+                         % (name, x, size[1]/2.0, z, *size, yaw, texture))
+            break
+    return lines, placed
+
+
+def place_cubes(rng, base, cameras, shapes, others=()):
     """random place, yaw, pitch and roll for every cube, all seen from the eye, shapes[index] is the shape of the
-    cube (SHAPES)"""
+    cube (SHAPES), the box of every cube is at least the gap from the boxes of others (box, gap)"""
     placed = []     # (box, params, visible sample points, sample count)
     order = sorted(range(len(base)), key=lambda i: -max(base[i][0]))   # big cubes first
     result = [None]*len(base)
@@ -492,6 +573,8 @@ def place_cubes(rng, base, cameras, shapes):
             if any(box.distance(c) < MIN_CAMERA_DISTANCE for c in cameras):
                 continue
             if any(math.dist(box.c, o[0].c) < box.radius + o[0].radius + CUBE_GAP for o in placed):
+                continue
+            if any(boxes_near(box, o, gap) for o, gap in others):
                 continue
             samples = box.face_samples(EYE)
             visible = [p for p in samples if not blocked(EYE, p, [o[0] for o in placed])]
@@ -519,7 +602,7 @@ def place_cubes(rng, base, cameras, shapes):
     return [boxes[id(r[0])][1] for r in result], [o[0] for o in placed]
 
 
-def random_light(rng, boxes):
+def random_light(rng, boxes, blockers=None):
     for _ in range(20000):
         pos = (round(rng.uniform(-LIGHT_AREA, LIGHT_AREA), -1), round(rng.uniform(*LIGHT_HEIGHT), -1),
                round(rng.uniform(-LIGHT_AREA, LIGHT_AREA), -1))
@@ -528,7 +611,7 @@ def random_light(rng, boxes):
         direction = tuple(round(c/n, 4) for c in v)
         n = math.sqrt(dot(direction, direction))
         direction = tuple(c/n for c in direction)
-        if light_touches(pos, direction, boxes) >= LIGHT_MIN_CUBES:
+        if light_touches(pos, direction, boxes, blockers=blockers) >= LIGHT_MIN_CUBES:
             return pos, tuple(round(c, 4) for c in direction)
     return None
 
@@ -539,22 +622,26 @@ def generate(number, cameras, base):
     shape_rng = random.Random('shapes%d' % number)
     shapes = [shape_rng.choice(SHAPES) for _ in base]
     while True:
-        placed = place_cubes(rng, base, cameras, shapes)
+        people_lines, others = place_people_and_cars(rng, cameras)
+        placed = place_cubes(rng, base, cameras, shapes, others)
         if not placed:
             continue
         params, boxes = placed
         lights = []
         for _ in range(rng.randint(1, 3)):
-            light = random_light(rng, boxes)
+            light = random_light(rng, boxes, boxes + [o for o, _ in others])
             if not light:
                 break
             lights.append(light)
         else:
             break
     ambient = round(rng.uniform(MIN_AMBIENT, MAX_AMBIENT), 2)
-    text = '# objects%d.dat, random cubes, balls, cylinders, cones and spot lights\n' % number + HEADER
+    text = ('# objects%d.dat, random cubes, balls, cylinders, cones, cars, people and spot lights\n' % number
+            + HEADER)
     for shape, x, y, z, size, yaw, pitch, roll, texture in params:
         text += '%s=%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%.1f/%s\n' % (shape, x, y, z, *size, yaw, pitch, roll, texture)
+    if people_lines:
+        text += '\n# cars and people standing on the floor\n' + ''.join(people_lines)
     text += LIGHT_HEADER
     for pos, d in lights:
         text += 'SpotLight=%.1f/%.1f/%.1f/%.4f/%.4f/%.4f/%.1f/%.1f/1.0/1.0/1.0\n' % (*pos, *d, LIGHT_INNER, LIGHT_OUTER)
@@ -563,12 +650,19 @@ def generate(number, cameras, base):
 
 
 if __name__ == '__main__':
-    objects_directory = read_objects_directory()
+    arguments = [a for a in sys.argv[1:] if not a.startswith('--objectsDirectory=')]
+    directories = [a.split('=', 1)[1] for a in sys.argv[1:] if a.startswith('--objectsDirectory=')]
+    if len(arguments) != 2 or (directories and not directories[-1]):
+        sys.exit('usage: genobjects.py <first> <last> [--objectsDirectory=<directory>]')
+    if directories:
+        objects_directory = os.path.abspath(os.path.expanduser(directories[-1]))
+    else:
+        objects_directory = read_objects_directory()
     create_directory(objects_directory)
     cameras = read_camera_positions()
     create_base(objects_directory, cameras)
-    base = read_base_cubes(objects_directory)
-    first, last = int(sys.argv[1]), int(sys.argv[2])
+    base = read_base_cubes(objects_directory)*BASE_COPIES
+    first, last = int(arguments[0]), int(arguments[1])
     for n in range(first, last + 1):
         open(os.path.join(objects_directory, 'objects%d.dat' % n), 'w').write(generate(n, cameras, base))
         print('objects%d.dat' % n, flush=True)
