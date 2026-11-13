@@ -1,0 +1,34 @@
+# example objects file with the 3 car types: Car (sedan), Suv and SportCar, 7 cars around the cameras
+# (cameraObjectPosition<number> of configs/cameraobjects_ids.ini), every car stands on the floor and is seen from
+# 0/1000/0. Open it with:
+#     cp examples/objects_cars.dat <cameraImageOutputDirectory>/camera_objects/
+#     ./prj-camera-image-creator --objectsFile=objects_cars.dat
+#
+# Car=, Suv= and SportCar= have the same values as the other objects, x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture:
+# center x/y/z and sizes in mm (2000 = 2.0), yaw/pitch/roll in degrees, texture image of the images folder.
+# The car fits into the cube of the values: sizeX is its width with the side mirrors, sizeY its height and sizeZ its
+# length, its front is +z of the cube (yaw 0 = front toward +z, yaw 90 = front toward +x) and its wheels touch the
+# bottom of the cube, so y = sizeY/2 puts it on the floor.
+# The texture is the paint (images/car_red.png, car_blue.png, car_silver.png, car_white.png, car_black.png, or any
+# other image), the windows, tires, rims, lights, grille, license plates and the other details have their own colors.
+# Car: sedan of 4.6 m x 1.8 m x 1.45 m (2.0 m wide with the mirrors) is 2000/1450/4600.
+# Suv: SUV of 4.7 m x 1.9 m x 1.75 m (2.1 m with the mirrors) is 2100/1750/4700, it has roof rails and side skirts.
+# SportCar: sports car of 4.4 m x 1.9 m x 1.25 m (2.05 m with the mirrors) is 2050/1250/4400, it has a rear wing.
+
+# a sedan, an SUV and a sports car side by side in front of camera 1, their fronts toward -x
+Car=0.0/725.0/6500.0/2000.0/1450.0/4600.0/-90.0/0.0/0.0/car_red.png
+Suv=-4300.0/875.0/5000.0/2100.0/1750.0/4700.0/-90.0/0.0/0.0/car_silver.png
+SportCar=4300.0/625.0/5000.0/2050.0/1250.0/4400.0/-90.0/0.0/0.0/car_blue.png
+
+# behind the cameras: SUVs at the back left and in the middle, a sports car at the back right
+Suv=-3800.0/875.0/-5200.0/2100.0/1750.0/4700.0/30.0/0.0/0.0/car_white.png
+Suv=600.0/875.0/-7000.0/2100.0/1750.0/4700.0/150.0/0.0/0.0/car_black.png
+SportCar=3800.0/625.0/-5000.0/2050.0/1250.0/4400.0/-30.0/0.0/0.0/car_red.png
+
+# a sedan at the right, turned
+Car=6500.0/725.0/0.0/2000.0/1450.0/4600.0/20.0/0.0/0.0/car_white.png
+
+# light from above and from the front right, ambient light
+SpotLight=0.0/7000.0/0.0/0.0000/-1.0000/0.0000/60.0/75.0/0.7/0.7/0.7
+SpotLight=6000.0/5000.0/6000.0/-0.6092/-0.5077/-0.6092/30.0/45.0/1.0/1.0/1.0
+AmbientLight=0.25/0.25/0.25

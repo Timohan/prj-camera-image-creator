@@ -20,6 +20,9 @@ private:
     GLuint m_vertexArrayObject;
     GLuint m_vertexBufferObject;
     GLuint m_textureIndex;
+    // cars and people: white texture of their details (windows, tires, skin...), they are after the paint vertices
+    GLuint m_detailTexture;
+    int m_paintVerticesCount;
     int m_verticesCount;
 };
 

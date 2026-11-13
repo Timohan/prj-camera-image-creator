@@ -27,7 +27,9 @@ bool ObjectsConfig::read(const std::string &filename)
     }
     const std::pair<const char *, ObjectShape> shapes[] = {
         { "Cube", ObjectShape::Cube }, { "Ball", ObjectShape::Ball }, { "Cylinder", ObjectShape::Cylinder },
-        { "Cone", ObjectShape::Cone } };
+        { "Cone", ObjectShape::Cone }, { "Car", ObjectShape::Car },
+        { "Suv", ObjectShape::Suv }, { "SportCar", ObjectShape::SportCar },
+        { "Man", ObjectShape::Man }, { "Woman", ObjectShape::Woman }, { "Child", ObjectShape::Child } };
     for (const auto &[key, shape] : shapes) {
         for (const std::string &value : ini.getValues(key)) {
             CubeConfig cube;

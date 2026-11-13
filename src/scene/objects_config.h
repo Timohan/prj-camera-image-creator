@@ -13,6 +13,14 @@ enum class ObjectShape
     Cylinder,   // its axis is the y axis of the cube, size y is its height and sizes x/z the diameters of its ends
     Cone,       // its axis is the y axis of the cube, sizes x/z are the diameters of its base (bottom, -y) and the tip
                 // is at the top (+y) of the cube
+    Car,        // sedan car in the cube: sizeX is its width with the side mirrors, sizeY its height and sizeZ its
+                // length, the front is +z and the wheels touch the bottom of the cube (-y)
+    Suv,        // SUV car in the cube like the car: tall body with a steep tailgate, high ground clearance, roof rails
+    SportCar,   // sports car in the cube like the car: low 2-door coupe with a long hood, fastback and a rear wing
+    Man,        // standing man that fills the cube: sizeX is his width from hand to hand, sizeY his height and sizeZ
+                // his depth, he looks toward +z and stands on the bottom of the cube (-y)
+    Woman,      // standing woman that fills the cube like the man: T-shirt, knee-length skirt and long hair
+    Child,      // standing child (about 7 years) that fills the cube like the man: T-shirt, shorts and sneakers
 };
 
 struct CubeConfig
@@ -48,7 +56,19 @@ struct SpotLightConfig
  * Every cone is written as Cone=x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture with the same values: the cone fits
  * into the cube of the same values, its base is the ellipse of the diameters sizeX and sizeZ at the bottom of the
  * cube (-y) and its tip is at the middle of the top of the cube (+y), sizeY is its height.
- * The list has the cubes first, then the balls, the cylinders and the cones.
+ * Every car is written as Car=x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture with the same values: a sedan car fits
+ * into the cube of the same values, sizeX is its width (with the side mirrors), sizeY its height and sizeZ its length,
+ * its front is +z of the cube and its wheels touch the bottom of the cube (-y). The texture is its paint, the
+ * windows, tires, rims, lights, grille and license plates have their own colors.
+ * Every SUV is written as Suv=... and every sports car as SportCar=... with the same values as the car.
+ * Every man is written as Man=x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture with the same values: a standing man
+ * (his arms down at his sides) fills the cube of the same values, sizeX is his width from hand to hand, sizeY his
+ * height and sizeZ his depth (from his back to his toes), he looks toward +z of the cube and stands on its bottom
+ * (-y). The texture is his shirt, his skin, hair, jeans and shoes have their own colors.
+ * Every woman (1.65 m, 490/1650/300 keeps her proportions) is written as Woman=... and every child (1.20 m,
+ * 360/1200/215) as Child=... with the same values as the man (560/1800/310), the texture is the shirt.
+ * The list has the cubes first, then the balls, the cylinders, the cones, the cars, the SUVs, the sports cars, the
+ * men, the women and the children.
  * Every spot light is written as
  * SpotLight=x/y/z/directionX/directionY/directionZ/innerAngle/outerAngle/r/g/b,
  * position is in mm, angles in degrees. AmbientLight=r/g/b is optional.

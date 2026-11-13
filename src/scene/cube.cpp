@@ -1,4 +1,6 @@
 #include "cube.h"
+#include "car_mesh.h"
+#include "human_mesh.h"
 #include "../shader/camera_shader.h"
 #include <application/tg_application.h>
 #include <string>
@@ -37,6 +39,8 @@ Cube::Cube() :
     m_vertexArrayObject(0),
     m_vertexBufferObject(0),
     m_textureIndex(0),
+    m_detailTexture(0),
+    m_paintVerticesCount(0),
     m_verticesCount(0)
 {
 }
@@ -48,6 +52,9 @@ Cube::~Cube()
     }
     if (m_vertexBufferObject) {
         glDeleteBuffers(1, &m_vertexBufferObject);
+    }
+    if (m_detailTexture) {
+        glDeleteTextures(1, &m_detailTexture);
     }
 }
 
@@ -176,7 +183,34 @@ int Cube::init()
         const float len = sqrtf(n[0]*n[0] + n[1]*n[1] + n[2]*n[2]);
         listVertices.push_back( { c[0], c[1], c[2], n[0]/len, n[1]/len, n[2]/len, s, t, 1.0f, 1.0f, 1.0f, 1.0f } );
     };
-    if (m_config.shape == ObjectShape::Cone) {
+    // cars and people are generated meshes, the other shapes are made here
+    const bool isMesh = m_config.shape == ObjectShape::Car || m_config.shape == ObjectShape::Suv
+            || m_config.shape == ObjectShape::SportCar || m_config.shape == ObjectShape::Man
+            || m_config.shape == ObjectShape::Woman || m_config.shape == ObjectShape::Child;
+    if (isMesh) {
+        // the paint first (texture of the object), then the details (white texture, their vertex colors)
+        std::vector<MeshVertex> paint, detail;
+        if (m_config.shape == ObjectShape::Man || m_config.shape == ObjectShape::Woman
+                || m_config.shape == ObjectShape::Child) {
+            const HumanType type = m_config.shape == ObjectShape::Woman ? HumanType::Woman
+                    : (m_config.shape == ObjectShape::Child ? HumanType::Child : HumanType::Man);
+            buildHumanMesh(type, m_config.size.x, m_config.size.y, m_config.size.z, paint, detail);
+        } else {
+            const CarType type = m_config.shape == ObjectShape::Suv ? CarType::Suv
+                    : (m_config.shape == ObjectShape::SportCar ? CarType::Sport : CarType::Sedan);
+            buildCarMesh(type, m_config.size.x, m_config.size.y, m_config.size.z, paint, detail);
+        }
+        for (const std::vector<MeshVertex> *list : { &paint, &detail }) {
+            for (const MeshVertex &v : *list) {
+                float c[3], n[3];
+                transform(v.position, c);
+                rotate(v.normal, n);
+                listVertices.push_back( { c[0], c[1], c[2], n[0], n[1], n[2], v.st[0], v.st[1],
+                                          v.color[0], v.color[1], v.color[2], v.color[3] } );
+            }
+        }
+        m_paintVerticesCount = static_cast<int>(paint.size());
+    } else if (m_config.shape == ObjectShape::Cone) {
         const int segmentsPerTexture = CONE_SEGMENTS/BALL_TEXTURES_AROUND;
         for (int segment=0;segment<CONE_SEGMENTS;segment++) {
             const int segmentBase = segment/segmentsPerTexture*segmentsPerTexture;
@@ -245,6 +279,9 @@ int Cube::init()
     }
 
     m_verticesCount = static_cast<int>(listVertices.size());
+    if (!isMesh) {
+        m_paintVerticesCount = m_verticesCount;
+    }
     glGenVertexArrays(1, &m_vertexArrayObject);
     glGenBuffers(1, &m_vertexBufferObject);
     glBindVertexArray(m_vertexArrayObject);
@@ -272,6 +309,15 @@ int Cube::init()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
+    if (m_paintVerticesCount < m_verticesCount) {
+        const unsigned char white[4] = { 255, 255, 255, 255 };
+        glGenTextures(1, &m_detailTexture);
+        glBindTexture(GL_TEXTURE_2D, m_detailTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
     return 0;
 }
 
@@ -285,6 +331,10 @@ void Cube::render()
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribTextCoord]);
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor]);
     glBindTexture(GL_TEXTURE_2D, m_textureIndex);
-    glDrawArrays(GL_TRIANGLES, 0, m_verticesCount);
+    glDrawArrays(GL_TRIANGLES, 0, m_paintVerticesCount);
+    if (m_detailTexture) {
+        glBindTexture(GL_TEXTURE_2D, m_detailTexture);
+        glDrawArrays(GL_TRIANGLES, m_paintVerticesCount, m_verticesCount - m_paintVerticesCount);
+    }
     glBindVertexArray(0);
 }

@@ -1,0 +1,42 @@
+# example objects file with standing people (Man, Woman and Child) around the cameras (cameraObjectPosition<number>
+# of configs/cameraobjects_ids.ini) and a car next to them, every one stands on the floor and is seen from 0/1000/0.
+# Open it with:
+#     cp examples/objects_people.dat <cameraImageOutputDirectory>/camera_objects/
+#     ./prj-camera-image-creator --objectsFile=objects_people.dat
+#
+# Man=, Woman= and Child= have the same values as the other objects, x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture:
+# center x/y/z and sizes in mm (2000 = 2.0), yaw/pitch/roll in degrees, texture image of the images folder.
+# The standing person (the arms down at the sides) fills the cube of the values: sizeX is the width from hand to
+# hand, sizeY the height and sizeZ the depth (from the back to the toes), the person looks toward +z of the cube
+# (yaw 0 = toward +z, yaw 180 = toward -z) and stands on its bottom, so y = sizeY/2 puts the person on the floor.
+# Man: 1.80 m is 560/1800/310, T-shirt, jeans with a belt, short hair.
+# Woman: 1.65 m is 490/1650/300, T-shirt, knee-length skirt, long hair to the shoulders.
+# Child: 1.20 m (about 7 years) is 360/1200/215, T-shirt, shorts, sneakers.
+# All 3 sizes scaled the same keep the proportions (a man of 1.70 m is 529/1700/293).
+# The texture is the shirt (images/shirt_blue.png, shirt_red.png, shirt_white.png, shirt_green.png,
+# shirt_gray.png, or any other image), the skin, hair, jeans, skirt, shorts, belt and shoes have their own colors.
+
+# 3 men in front of camera 1: in the middle toward the cameras, at the left turned a little, at the right from the side
+Man=0.0/900.0/3000.0/560.0/1800.0/310.0/180.0/0.0/0.0/shirt_blue.png
+Man=-1300.0/850.0/3400.0/529.0/1700.0/293.0/150.0/0.0/0.0/shirt_red.png
+Man=1300.0/900.0/3300.0/560.0/1800.0/310.0/250.0/0.0/0.0/shirt_white.png
+
+# 3 men behind the cameras: toward camera 4, from the side and from the back
+Man=0.0/925.0/-3600.0/575.0/1850.0/318.0/0.0/0.0/0.0/shirt_green.png
+Man=1200.0/900.0/-3700.0/560.0/1800.0/310.0/90.0/0.0/0.0/shirt_gray.png
+Man=-1200.0/900.0/-3700.0/560.0/1800.0/310.0/180.0/0.0/0.0/shirt_blue.png
+
+# a family behind the men, seen by camera 4, and a woman with a child at the right, from the side
+Man=3900.0/900.0/-6000.0/560.0/1800.0/310.0/0.0/0.0/0.0/shirt_white.png
+Woman=3250.0/825.0/-6000.0/490.0/1650.0/300.0/0.0/0.0/0.0/shirt_red.png
+Child=2650.0/600.0/-5900.0/360.0/1200.0/215.0/0.0/0.0/0.0/shirt_green.png
+Woman=3000.0/825.0/-1900.0/490.0/1650.0/300.0/110.0/0.0/0.0/shirt_green.png
+Child=3100.0/600.0/-1200.0/360.0/1200.0/215.0/290.0/0.0/0.0/shirt_blue.png
+
+# a car behind the people at the right, for the scale
+Car=3200.0/725.0/5200.0/2000.0/1450.0/4600.0/-70.0/0.0/0.0/car_silver.png
+
+# light from above and from the front right, ambient light
+SpotLight=0.0/7000.0/0.0/0.0000/-1.0000/0.0000/60.0/75.0/0.7/0.7/0.7
+SpotLight=6000.0/5000.0/6000.0/-0.6092/-0.5077/-0.6092/30.0/45.0/1.0/1.0/1.0
+AmbientLight=0.3/0.3/0.3

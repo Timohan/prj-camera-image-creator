@@ -138,6 +138,56 @@ every line and on the values. Copy it to the objects directory and open it:
     cp examples/objects_shapes.dat /mnt/cameras/camera_objects/
     ./prj-camera-image-creator --objectsFile=objects_shapes.dat
 
+examples/objects_cars.dat has the 3 car types, a sedan (Car), an SUV (Suv) and a sports car (SportCar), 7 cars
+around the cameras:
+
+    cp examples/objects_cars.dat /mnt/cameras/camera_objects/
+    ./prj-camera-image-creator --objectsFile=objects_cars.dat
+
+`Car=`, `Suv=` and `SportCar=` have the same values x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture as the other
+objects. The car (src/scene/car_mesh.cpp) fits into the cube of the values: sizeX is its width with the side mirrors,
+sizeY its height and sizeZ its length, its front is +z of the cube and its wheels touch the bottom of the cube
+(y = sizeY/2 puts it on the floor). Realistic sizes:
+
+| Type | Car | Values | Example |
+|---|---|---|---|
+| `Car` | sedan, 4 doors, hood, cabin and trunk, 4.6 m x 1.8 m x 1.45 m | 2000/1450/4600 | `Car=0/725/6500/2000/1450/4600/-90/0/0/car_red.png` |
+| `Suv` | tall 2-box body, steep tailgate, high ground clearance, large wheels, roof rails, dark side skirts, 4.7 m x 1.9 m x 1.75 m | 2100/1750/4700 | `Suv=-4300/875/5000/2100/1750/4700/-90/0/0/car_silver.png` |
+| `SportCar` | low 2-door coupe, long hood, fastback, large low-profile wheels, side intakes, rear wing, 4.4 m x 1.9 m x 1.25 m | 2050/1250/4400 | `SportCar=4300/625/5000/2050/1250/4400/-90/0/0/car_blue.png` |
+
+The body has wheel arches, a hood, a cabin and a trunk or a tailgate. The texture is its paint (images/car_red.png,
+car_blue.png, car_silver.png, car_white.png and car_black.png), the windows, tires, rims, lights, grille, license
+plates and door handles have their own colors. A car is one surface number in the data files. The objects file lists
+the cars after the cones: the cars, the SUVs and then the sports cars. tools/genobjects.py does not make cars.
+
+examples/objects_people.dat has standing men (Man), women (Woman) and children (Child) around the cameras and a car
+next to them:
+
+    cp examples/objects_people.dat /mnt/cameras/camera_objects/
+    ./prj-camera-image-creator --objectsFile=objects_people.dat
+
+`Man=`, `Woman=` and `Child=` have the same values x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture as the other
+objects. The standing person (src/scene/human_mesh.cpp, the arms down at the sides) fills the cube of the values:
+sizeX is the width from hand to hand, sizeY the height and sizeZ the depth (from the back to the toes), the person
+looks toward +z of the cube and stands on its bottom (y = sizeY/2 puts the person on the floor). Scale all 3 sizes the
+same for another height (a man of 1.70 m is 529/1700/293): size = normal size * height / normal height.
+examples/objects_people_sizes.dat has men, women and children of 5 heights each (10 cm smaller, 5 cm smaller, the
+normal height, 5 cm bigger and 10 cm bigger) in 3 rows in front of camera 1:
+
+    cp examples/objects_people_sizes.dat /mnt/cameras/camera_objects/
+    ./prj-camera-image-creator --objectsFile=objects_people_sizes.dat
+
+| Type | Person | Values | Example |
+|---|---|---|---|
+| `Man` | 1.80 m, T-shirt, jeans with a belt, short hair | 560/1800/310 | `Man=0/900/3000/560/1800/310/180/0/0/shirt_blue.png` |
+| `Woman` | 1.65 m, T-shirt, knee-length skirt, long hair to the shoulders | 490/1650/300 | `Woman=3250/825/-6000/490/1650/300/0/0/0/shirt_red.png` |
+| `Child` | 1.20 m (about 7 years), T-shirt, shorts, sneakers, short hair | 360/1200/215 | `Child=2650/600/-5900/360/1200/215/0/0/0/shirt_green.png` |
+
+The example of the man stands 3 m in front of camera 1 and looks at it. The texture is the shirt (images/shirt_blue.png,
+shirt_red.png, shirt_white.png, shirt_green.png and shirt_gray.png), the people have hair, eyes, eyebrows, a nose, a
+mouth, ears, hands and shoes. A person is one surface number in the data files, the objects file lists the men, the
+women and then the children after the sports cars. tools/genobjects.py does not make people.
+
 # Taking pictures
     prj-camera-image-creator --takePictures
 
