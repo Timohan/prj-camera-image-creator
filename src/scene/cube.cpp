@@ -69,6 +69,15 @@ void Cube::setup(const CubeConfig &config)
     m_config = config;
 }
 
+/*!
+ * \brief Cube::getConfig
+ * \return the shape, the center position, the sizes, yaw/pitch/roll and the texture of the object
+ */
+const CubeConfig &Cube::getConfig() const
+{
+    return m_config;
+}
+
 int Cube::init()
 {
     // corners are first relative to the center, they are rotated and moved to the position

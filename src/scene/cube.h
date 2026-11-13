@@ -14,6 +14,7 @@ public:
     void setup(const CubeConfig &config);
     int init();
     void render();
+    const CubeConfig &getConfig() const;
 
 private:
     CubeConfig m_config;

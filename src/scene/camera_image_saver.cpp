@@ -47,6 +47,8 @@
 // surface block after the camera and lens information in the data file
 #define DATA_SURFACE_MAGIC          "SURF"
 #define DATA_SURFACE_VERSION        1
+#define DATA_OBJECTS_MAGIC          "OBJS"
+#define DATA_OBJECTS_VERSION        1
 
 /*!
  * \brief CameraImageSaver::getScaledConfig
@@ -157,10 +159,12 @@ CameraImageSaver::LensLimits CameraImageSaver::getLensLimits(const CameraObjectC
  * \param cameraNumber number of the camera (1-cameraCount), it is saved to the data file
  * \param imageFilename full path of the png file
  * \param dataFilename full path of the binary data file, if it is empty, only the png file is saved
+ * \param objects what the surface numbers are (sky, ground and every object), saved to the data file
  * \return true on success
  */
 bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &render, float zNear, float zFar, int supersampling,
-                            int cameraNumber, const std::string &imageFilename, const std::string &dataFilename)
+                            int cameraNumber, const std::string &imageFilename, const std::string &dataFilename,
+                            const std::vector<SurfaceObject> &objects)
 {
     cv::Mat image, distance, surface;
     supersampling = std::max(1, supersampling);
@@ -181,7 +185,31 @@ bool CameraImageSaver::save(const CameraObject &camera, const RenderFunction &re
     if (dataFilename.empty()) {
         return true;
     }
-    return saveData(camera, cameraNumber, distance, surface, dataFilename);
+    return saveData(camera, cameraNumber, distance, surface, dataFilename, objects);
+}
+
+/*!
+ * \brief CameraImageSaver::getObjectClass
+ * \return class of the object of the shape in the data file
+ */
+CameraImageSaver::ObjectClass CameraImageSaver::getObjectClass(ObjectShape shape)
+{
+    switch (shape) {
+    case ObjectShape::Car:
+        return ObjectSedan;
+    case ObjectShape::Suv:
+        return ObjectSuv;
+    case ObjectShape::SportCar:
+        return ObjectSportCar;
+    case ObjectShape::Man:
+        return ObjectMan;
+    case ObjectShape::Woman:
+        return ObjectWoman;
+    case ObjectShape::Child:
+        return ObjectChild;
+    default:
+        return ObjectUnknown;
+    }
 }
 
 /*!
@@ -253,17 +281,25 @@ void CameraImageSaver::shrinkImage(int supersampling, cv::Mat *image, cv::Mat *d
  * that do not see anything, 1 is the floor and the direction lines on it, 2 is the first cube, then the other cubes
  * and the camera objects), then float normal x/y/z of every pixel row by row (unit vector in the world, turned toward
  * the camera, 0 if the surface number is 0). Pixels of the same object have the same surface number, a flat face
- * of an object is its pixels that have the same normal.
+ * of an object is its pixels that have the same normal,
+ * then what the surface numbers are:
+ * char[4] "OBJS", uint32_t version (1), uint32_t count, then for every surface uint32_t surface number, uint32_t
+ * class (ObjectClass: 0 sky, 1 ground, 2 unknown object (cube, ball, cylinder or cone), 3 sedan car, 4 SUV, 5 sports
+ * car, 6 man, 7 woman, 8 child) and doubles: center x/y/z of the box of the object (mm), sizes x/y/z of the box (mm),
+ * yaw, pitch and roll (degrees) as in the objects file, all 0 for the sky and the ground. A car or a person fills its
+ * box (its front is +z of the box before yaw, it stands on the bottom of the box), so the box gives its type, size,
+ * position and heading.
  * World coordinates: x right, y up, z forward (left-handed).
  * \param camera camera object
  * \param cameraNumber number of the camera
  * \param distance distance of every pixel in opengl units, DISTANCE_SKY or DISTANCE_NO_VIEW
  * \param surface normal (rgb) and surface number (alpha) of every pixel
  * \param filename full path of the data file
+ * \param objects what the surface numbers are
  * \return true on success
  */
 bool CameraImageSaver::saveData(const CameraObject &camera, int cameraNumber, const cv::Mat &distance, const cv::Mat &surface,
-                                const std::string &filename)
+                                const std::string &filename, const std::vector<SurfaceObject> &objects)
 {
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {
@@ -354,6 +390,19 @@ bool CameraImageSaver::saveData(const CameraObject &camera, int cameraNumber, co
             }
         }
         file.write(reinterpret_cast<const char *>(normalRow.data()), static_cast<std::streamsize>(normalRow.size()*sizeof(float)));
+    }
+
+    file.write(DATA_OBJECTS_MAGIC, 4);
+    writeUint32(DATA_OBJECTS_VERSION);
+    writeUint32(static_cast<uint32_t>(objects.size()));
+    for (const SurfaceObject &object : objects) {
+        writeUint32(object.surface);
+        writeUint32(object.objectClass);
+        writeVector(object.position, MM_TO_OPENGL_UNIT);
+        writeVector(object.size, MM_TO_OPENGL_UNIT);
+        writeDouble(object.yaw);
+        writeDouble(object.pitch);
+        writeDouble(object.roll);
     }
 
     if (!file.good()) {

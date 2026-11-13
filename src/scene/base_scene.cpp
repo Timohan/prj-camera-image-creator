@@ -423,6 +423,16 @@ void BaseScene::saveCameraImages(bool withData)
     localtime_r(&now, &localTime);
     strftime(timestamp, sizeof(timestamp), "%Y%m%d-%H%M%S", &localTime);
 
+    // what the surface numbers of the data files are: the sky, the ground (floor and direction lines) and the objects
+    std::vector<CameraImageSaver::SurfaceObject> objects;
+    objects.push_back({ 0, CameraImageSaver::ObjectSky, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, 0.0f, 0.0f, 0.0f });
+    objects.push_back({ SURFACE_FLOOR, CameraImageSaver::ObjectGround, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f },
+                        0.0f, 0.0f, 0.0f });
+    for (int i=0;i<m_cubeCount;i++) {
+        const CubeConfig &config = m_listCube[i].getConfig();
+        objects.push_back({ static_cast<uint32_t>(SURFACE_FIRST_CUBE + i), CameraImageSaver::getObjectClass(config.shape),
+                            config.position, config.size, config.yaw, config.pitch, config.roll });
+    }
     // smaller images are rendered larger and shrunk, but never larger than the resolution of the camera
     const int supersampling = std::max(1, std::min(MAX_SUPERSAMPLING, static_cast<int>(floorf(1.0f/m_imageOutputScale + 0.0001f))));
     for (int i=0;i<m_cameraCount;i++) {
@@ -436,7 +446,7 @@ void BaseScene::saveCameraImages(bool withData)
         CameraObject camera;
         camera.setup(CameraImageSaver::getScaledConfig(m_listCameraObject[i].getConfig(), m_imageOutputScale), 1.0f);
         if (CameraImageSaver::save(camera, render, CAMERA_NEAR_PLANE, CAMERA_FAR_PLANE, supersampling,
-                                   i + 1, filename + ".png", withData ? filename + ".dat" : std::string())) {
+                                   i + 1, filename + ".png", withData ? filename + ".dat" : std::string(), objects)) {
             TG_INFO_LOG("Saved", filename + (withData ? ".png and .dat" : ".png"));
         }
     }
