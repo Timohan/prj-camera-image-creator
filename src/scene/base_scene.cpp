@@ -42,7 +42,7 @@ BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_listCube(nullptr),
     m_cubeCount(0),
     m_ambientLight({ 0.0f, 0.0f, 0.0f }),
-    m_hideUnseen(false),
+    m_hiddenAreas(HiddenAreas::Shown),
     m_visibilityMapChanged(true),
     m_listCameraObject(nullptr),
     m_cameraCount(0),
@@ -63,7 +63,8 @@ BaseScene::BaseScene(const std::string &objectsFile, int camerasVisible) :
     m_pickedWindowX(0),
     m_pickedWindowY(0),
     m_pickedCamera(0),
-    m_pickedDistance(PICK_OUTSIDE)
+    m_pickedDistance(PICK_OUTSIDE),
+    m_pickedSurface(-1)
 {
     setupVisualPosition();
     // camerasVisible of the command line is used instead of general.ini
@@ -162,10 +163,11 @@ void BaseScene::customRender(float width, float height)
     }
     viewMatrix = m_camera.getViewMatrix();
 
-    if (m_hideUnseen && m_visibilityMapChanged) {
+    const bool hideUnseen = m_hiddenAreas != HiddenAreas::Shown;
+    if (hideUnseen && m_visibilityMapChanged) {
         createVisibilityMap();
     }
-    m_visibilityMap.setupShader(m_shader.generalShader(), m_hideUnseen);
+    m_visibilityMap.setupShader(m_shader.generalShader(), hideUnseen);
     // camera object does not see its own cone
     renderScene(mvp, viewMatrix, m_cameraIndex-1, nullptr, false);
     // saved images and the maps are rendered without the visibility
@@ -180,7 +182,8 @@ void BaseScene::customRender(float width, float height)
 /*!
  * \brief BaseScene::renderPick
  * renders the distance from the view position to every pixel of the current viewport like the saved distances
- * (float framebuffer, exact also far away) and reads the distance of the picked pixel
+ * (float framebuffer, exact also far away) and reads the distance of the picked pixel, then renders the surface
+ * pass like the saved data files and reads the surface number of the picked pixel (what object it is)
  * \param projection projection matrix of the view
  * \param view view matrix of the view
  * \param width, height size of the window
@@ -193,6 +196,7 @@ void BaseScene::renderPick(const Matrix4x4 &projection, const Matrix4x4 &view, f
     m_pickedWindowY = static_cast<int>(m_pickY);
     m_pickedCamera = m_cameraIndex;
     m_pickedDistance = PICK_OUTSIDE;
+    m_pickedSurface = -1;
     const GLint windowWidth = static_cast<GLint>(width);
     const GLint windowHeight = static_cast<GLint>(height);
     // opengl rows start from the bottom
@@ -219,7 +223,7 @@ void BaseScene::renderPick(const Matrix4x4 &projection, const Matrix4x4 &view, f
     glGenFramebuffers(1, &framebuffer);
     glGenRenderbuffers(2, renderbuffers);
     glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[0]);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_R32F, windowWidth, windowHeight);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA32F, windowWidth, windowHeight);
     glBindRenderbuffer(GL_RENDERBUFFER, renderbuffers[1]);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, windowWidth, windowHeight);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
@@ -242,6 +246,13 @@ void BaseScene::renderPick(const Matrix4x4 &projection, const Matrix4x4 &view, f
         glPixelStorei(GL_PACK_ALIGNMENT, 1);
         glReadPixels(x, y, 1, 1, GL_RED, GL_FLOAT, &distance);
         m_pickedDistance = distance < 0.0f ? PICK_SKY : distance;
+        // surface number is in alpha, 0 (cleared) is the sky
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        renderScene(projection, view, m_cameraIndex-1, &position, true);
+        GLfloat surface = 0.0f;
+        glReadPixels(x, y, 1, 1, GL_ALPHA, GL_FLOAT, &surface);
+        m_pickedSurface = static_cast<int>(lroundf(surface));
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(oldFramebuffer));
@@ -281,23 +292,57 @@ bool BaseScene::takePicked()
 
 /*!
  * \brief BaseScene::getPickedText
- * \return "<x>/<y> Distance from camera: <distance>" of the picked window pixel, "Camera <number> " before it in
- * the camera object view, distance is from the position of the view in mm, "Sky" if no object is there or
- * "N/A" outside of the image of the camera object view
+ * \return "<x>/<y> Distance: <distance> mm, <object>" of the picked window pixel, "Camera <number> " before it in
+ * the camera object view, distance is from the position of the view in mm, the object is "Ground" (the floor and
+ * the direction lines), "Unknown object" (cube, ball, cylinder or cone), the type and the height of a person
+ * ("Man, height 1800 mm"), the type and the sizes of a car ("SUV, 4700 x 1900 x 1750 mm", length x width x height),
+ * "Camera object" or "Sky" if no object is there, "N/A" outside of the image of the camera object view
  */
 std::string BaseScene::getPickedText() const
 {
-    std::string text = std::to_string(m_pickedWindowX) + "/" + std::to_string(m_pickedWindowY) + " Distance from camera: ";
+    std::string text = std::to_string(m_pickedWindowX) + "/" + std::to_string(m_pickedWindowY);
     if (m_pickedCamera > 0) {
         text = "Camera " + std::to_string(m_pickedCamera) + " " + text;
     }
     if (m_pickedDistance == PICK_OUTSIDE) {
-        return text + "N/A";
+        return text + " Distance: N/A";
     }
     if (m_pickedDistance == PICK_SKY) {
-        return text + "Sky";
+        return text + " Sky";
     }
-    return text + std::to_string(std::llround(static_cast<double>(m_pickedDistance)*MM_TO_OPENGL_UNIT)) + " mm";
+    auto mm = [](float openglUnits) {
+        return std::to_string(std::llround(static_cast<double>(openglUnits)*MM_TO_OPENGL_UNIT));
+    };
+    text += " Distance: " + mm(m_pickedDistance) + " mm";
+    const int cube = m_pickedSurface - SURFACE_FIRST_CUBE;
+    if (m_pickedSurface == SURFACE_FLOOR) {
+        return text + ", Ground";
+    }
+    if (cube >= m_cubeCount && cube < m_cubeCount + m_cameraCount) {
+        return text + ", Camera object";
+    }
+    if (cube < 0 || cube >= m_cubeCount) {
+        return text;
+    }
+    const CubeConfig &config = m_listCube[cube].getConfig();
+    const std::string carSizes = ", " + mm(config.size.z) + " x " + mm(config.size.x) + " x " + mm(config.size.y) + " mm";
+    const std::string height = ", height " + mm(config.size.y) + " mm";
+    switch (CameraImageSaver::getObjectClass(config.shape)) {
+    case CameraImageSaver::ObjectSedan:
+        return text + ", Sedan" + carSizes;
+    case CameraImageSaver::ObjectSuv:
+        return text + ", SUV" + carSizes;
+    case CameraImageSaver::ObjectSportCar:
+        return text + ", Sports car" + carSizes;
+    case CameraImageSaver::ObjectMan:
+        return text + ", Man" + height;
+    case CameraImageSaver::ObjectWoman:
+        return text + ", Woman" + height;
+    case CameraImageSaver::ObjectChild:
+        return text + ", Child" + height;
+    default:
+        return text + ", Unknown object";
+    }
 }
 
 /*!
@@ -338,6 +383,7 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
 {
     const int tranformPosition = glGetUniformLocation(m_shader.generalShader(), "transformPosition");
     const int surfaceId = glGetUniformLocation(m_shader.generalShader(), "surfaceId");
+    const int showUnseen = glGetUniformLocation(m_shader.generalShader(), "showUnseen");
 
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "projection"), 1, GL_FALSE,  projection.m );
     glUniformMatrix4fv( glGetUniformLocation(m_shader.generalShader(), "view"), 1, GL_FALSE, view.m );
@@ -370,8 +416,13 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
     }
     for (int i=0;i<m_cubeCount;i++) {
         glUniform1f(surfaceId, static_cast<float>(SURFACE_FIRST_CUBE + i));
+        // hidden areas of the cars and the people are shown in the mode of the known objects
+        const bool knownObject =
+            CameraImageSaver::getObjectClass(m_listCube[i].getConfig().shape) != CameraImageSaver::ObjectUnknown;
+        glUniform1f(showUnseen, m_hiddenAreas == HiddenAreas::KnownObjectsShown && knownObject ? 1.0f : 0.0f);
         m_listCube[i].render();
     }
+    glUniform1f(showUnseen, 0.0f);
     if (m_cameraObjectsVisible && hiddenCameraObject != NO_CAMERA_OBJECTS) {
         // camera objects are not bent by the earth curve
         glUniform1f(glGetUniformLocation(m_shader.generalShader(), "earthCurve"), 0.0f);
@@ -716,20 +767,32 @@ bool BaseScene::getCameraObjectsVisible() const
 
 /*!
  * \brief BaseScene::toggleHideUnseen
- * shows the pixels that no camera object sees (surfaces and sky) as black, or shows them normally
+ * next mode of the pixels that no camera object sees (surfaces and sky): shown normally, black, black except on the
+ * cars and the people (the known objects, their hidden areas are shown, the ground, the sky, the cubes, balls,
+ * cylinders, cones and the camera objects are black), and shown normally again
  */
 void BaseScene::toggleHideUnseen()
 {
-    m_hideUnseen = !m_hideUnseen;
+    switch (m_hiddenAreas) {
+    case HiddenAreas::Shown:
+        m_hiddenAreas = HiddenAreas::Black;
+        break;
+    case HiddenAreas::Black:
+        m_hiddenAreas = HiddenAreas::KnownObjectsShown;
+        break;
+    default:
+        m_hiddenAreas = HiddenAreas::Shown;
+        break;
+    }
 }
 
 /*!
- * \brief BaseScene::getHideUnseen
- * \return true if the surfaces and the sky that no camera object sees are black
+ * \brief BaseScene::getHiddenAreas
+ * \return the mode of the surfaces and the sky that no camera object sees
  */
-bool BaseScene::getHideUnseen() const
+BaseScene::HiddenAreas BaseScene::getHiddenAreas() const
 {
-    return m_hideUnseen;
+    return m_hiddenAreas;
 }
 
 void BaseScene::setupVisualPosition()

@@ -31,8 +31,11 @@ public:
     void toggleDirectionLine();
     void toggleCameraObjects();
     bool getCameraObjectsVisible() const;
+    // what the pixels that no camera object sees are: shown normally, black, or black except on the cars and people
+    enum class HiddenAreas { Shown, Black, KnownObjectsShown };
+    // key h: Shown -> Black -> KnownObjectsShown -> Shown
     void toggleHideUnseen();
-    bool getHideUnseen() const;
+    HiddenAreas getHiddenAreas() const;
     // withData: saves also the .dat files
     void requestSaveImages(bool withData = true);
     void startTurn(int direction);
@@ -61,7 +64,7 @@ private:
     VECTOR3 m_ambientLight;
     ShadowMap m_shadowMap;
     VisibilityMap m_visibilityMap;
-    bool m_hideUnseen;                  // pixels that no camera object sees are black
+    HiddenAreas m_hiddenAreas;          // pixels that no camera object sees are black (except on known objects)
     bool m_visibilityMapChanged;        // visibility map must be rendered again before it is used
     CameraObject *m_listCameraObject;
     int m_cameraCount;
@@ -91,6 +94,9 @@ private:
     int m_pickedCamera;                 // view of the pick, 0 is the base camera, 1-n is the camera object 1-n
     // distance of the picked pixel from the view position in opengl units, PICK_SKY or PICK_OUTSIDE
     float m_pickedDistance;
+    // surface number of the picked pixel (as in the data files: 0 sky, SURFACE_FLOOR, SURFACE_FIRST_CUBE + index of
+    // the object, then the camera objects), -1 outside of the image of the camera object view
+    int m_pickedSurface;
 
     void createCameraObjects();
     void createObjects();

@@ -6,8 +6,8 @@
 #define LABEL_MARGIN                10
 #define LABEL_HEIGHT                36
 #define LABEL_FONT_SIZE             20
-#define PIXEL_LABEL_WIDTH           500
-#define HIDDEN_LABEL_WIDTH          260
+#define PIXEL_LABEL_WIDTH           820
+#define HIDDEN_LABEL_WIDTH          320
 #define CAMERAS_LABEL_WIDTH         260
 #define LABEL_BACKGROUND_COLOR      30, 80, 200, 255
 #define LABEL_TEXT_COLOR            255, 255, 255
@@ -110,7 +110,17 @@ void MainWindow::customRender()
 
 void MainWindow::updateHiddenText()
 {
-    m_hiddenText.setText(m_baseScene.getHideUnseen() ? "Hidden areas: black" : "Hidden areas: shown");
+    switch (m_baseScene.getHiddenAreas()) {
+    case BaseScene::HiddenAreas::Black:
+        m_hiddenText.setText("Hidden areas: black");
+        break;
+    case BaseScene::HiddenAreas::KnownObjectsShown:
+        m_hiddenText.setText("Hidden areas: known objects");
+        break;
+    default:
+        m_hiddenText.setText("Hidden areas: shown");
+        break;
+    }
 }
 
 void MainWindow::updateCamerasText()

@@ -75,7 +75,8 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
  * Shadow of the spot light: the pixel is moved toward its normal by SHADOW_NORMAL_OFFSET texels of the
  * shadow map (no shadow acne), it is projected to the tile of the light in the shadow map and
  * compared with 3x3 linear filtered samples (soft edge).
- * When hideUnseen is 1.0, pixels that no camera object sees are black (VisibilityMap): a camera sees the pixel
+ * When hideUnseen is 1.0, pixels that no camera object sees are black (VisibilityMap), except on the objects that
+ * are drawn with showUnseen 1.0 (cars and people in the mode of the known objects): a camera sees the pixel
  * if the lens of the camera puts it inside the saved image and the distance map of the camera has no nearer
  * surface in its direction, the pixel is moved toward its normal by VISIBILITY_NORMAL_OFFSET texels like
  * in the shadow (far away the moved pixel can be above the horizon, where nothing hides it).
@@ -107,6 +108,7 @@ const char *CameraShader::m_fragShader = "" \
         "uniform vec3 distanceFrom;" \
         "uniform float surfaceId;" \
         "uniform float hideUnseen;" \
+        "uniform float showUnseen;" \
         "uniform int visibilityCameraCount;" \
         "uniform float visibilityTanHalf;" \
         "uniform float visibilityTexelAngle;" \
@@ -269,7 +271,7 @@ const char *CameraShader::m_fragShader = "" \
         "       } else if (distancePass > 0.5) {" \
         "           gl_FragColor = vec4(length(worldPosition - distanceFrom), 0.0, 0.0, 1.0);" \
         "       }" \
-        "       if (hideUnseen > 0.5 && distancePass < 0.5 && !seenByAnyCamera(normal)) {" \
+        "       if (hideUnseen > 0.5 && showUnseen < 0.5 && distancePass < 0.5 && !seenByAnyCamera(normal)) {" \
         "           gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);" \
         "       }" \
         "}";

@@ -222,23 +222,44 @@ of configs/general.ini, key 'c' still toggles them. The label next to the "Hidde
 or "Cameras: hidden".
 
 # Showing what the cameras cannot see
-Key 'h' shows every surface (floor, cubes, camera objects) and the sky that none of the cameras can see as black,
-pressing 'h' again shows them normally. The label next to the "Click a pixel" label shows "Hidden areas: black" or
-"Hidden areas: shown". A camera sees a pixel if its lens puts it inside the saved image
+Key 'h' changes between 3 modes of the surfaces and the sky that none of the cameras can see (the hidden areas),
+the label next to the "Click a pixel" label shows the mode:
+
+* "Hidden areas: shown": everything is shown normally (at the start)
+* "Hidden areas: black": every hidden surface (floor, cubes, balls, cylinders, cones, cars, people, camera objects)
+  and the hidden sky are black
+* "Hidden areas: known objects": the hidden areas of the cars and the people are shown normally, the other
+  hidden areas (ground, sky, cubes, balls, cylinders, cones and camera objects) are black
+
+Pressing 'h' again after the third mode shows everything normally. A camera sees a pixel if its lens puts it inside the saved image
 (resolution of imageOutputScale, distortion and field of view of cameraObjectsFile) and no nearer surface is
 in front of it (the camera objects never block the view, because they are not in the saved pictures).
 Saved pictures are not changed by 'h'.
 
-# Distance of a pixel
-Left mouse click on a pixel shows its distance in the label at the top left corner (white text on a blue background,
-"Click a pixel" before the first click), like in prj-camera-image-viewer:
+# Distance and object of a pixel
+Left mouse click on a pixel shows its distance and what object it is in the label at the top left corner (white text
+on a blue background, "Click a pixel" before the first click):
 
-    <x>/<y> Distance from camera: <distance> mm
+    <x>/<y> Distance: <distance> mm, <object>
 
 x/y is the window pixel from the top left corner and the distance is from the position of the current view (base camera
 or camera object) to the surface at that pixel, rendered like the distances of the saved data files. In the camera
-object view the text starts with "Camera <number>". "Sky" means no surface at that pixel, "N/A" is outside of the
-image of the camera object view.
+object view the text starts with "Camera <number>". The object is the class of the surface, as in the OBJS section of
+the data files:
+
+* "Ground": the floor and the direction lines
+* "Unknown object": a cube, ball, cylinder or cone
+* "Man", "Woman" or "Child" and the height of the person, e.g. "Woman, height 1650 mm"
+* "Sedan", "SUV" or "Sports car" and its length x width x height, e.g. "SUV, 4700 x 1900 x 1750 mm"
+* "Camera object": a camera object of the scene
+
+Examples:
+
+    1176/391 Distance: 7154 mm, Woman, height 1650 mm
+    Camera 2 412/530 Distance: 9675 mm, SUV, 4700 x 1900 x 1750 mm
+    586/751 Distance: 3008 mm, Ground
+
+"<x>/<y> Sky" means no surface at that pixel, "Distance: N/A" is outside of the image of the camera object view.
 
 # Tools
 
