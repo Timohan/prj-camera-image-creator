@@ -61,6 +61,7 @@ bool GeneralConfig::read(const std::string &filename)
         m_outputDirectory = (std::filesystem::path(cameraImageOutputDirectory) / CAMERA_OUTPUT_SUBDIRECTORY).string();
         m_objectsDirectory = (std::filesystem::path(cameraImageOutputDirectory) / CAMERA_OBJECTS_SUBDIRECTORY).string();
     }
+    ini.getString("modelsDirectory", &m_modelsDirectory);
     readPositive(ini, "moveSpeed", &m_moveSpeed);
     readPositive(ini, "moveSpeedMouseWheel", &m_moveSpeedMouseWheel);
     readPositive(ini, "imageOutputScale", &m_imageOutputScale);
@@ -183,4 +184,9 @@ bool GeneralConfig::getCamerasVisible() const
 float GeneralConfig::getImageOutputScale() const
 {
     return m_imageOutputScale;
+}
+
+const std::string &GeneralConfig::getModelsDirectory() const
+{
+    return m_modelsDirectory;
 }

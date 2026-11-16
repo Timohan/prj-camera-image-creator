@@ -196,10 +196,13 @@ CameraImageSaver::ObjectClass CameraImageSaver::getObjectClass(ObjectShape shape
 {
     switch (shape) {
     case ObjectShape::Car:
+    case ObjectShape::MercedesSClass:
         return ObjectSedan;
     case ObjectShape::Suv:
+    case ObjectShape::ToyotaFortuner:
         return ObjectSuv;
     case ObjectShape::SportCar:
+    case ObjectShape::AudiR8:
         return ObjectSportCar;
     case ObjectShape::Man:
         return ObjectMan;

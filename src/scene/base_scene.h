@@ -74,6 +74,7 @@ private:
     std::string m_cameraObjectsFile;
     std::string m_objectsDirectory;     // <cameraImageOutputDirectory>/camera_objects of general.ini
     std::string m_objectsFile;
+    std::string m_modelsDirectory;      // modelsDirectory of general.ini, the model files of Car_Audi_R8
     float m_imageOutputScale;
     bool m_saveImagesRequested;
     bool m_saveDataRequested;           // .dat files are saved with the requested images
@@ -105,6 +106,7 @@ private:
     void createVisibilityMap();
     void renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, int hiddenCameraObject,
                      const VECTOR3 *distanceFrom, bool surfacePass);
+    void renderGlass();
     void saveCameraImages(bool withData);
     void startTurnFromCurrent();
     void setTurnDirection(int *turnDirection, int direction);

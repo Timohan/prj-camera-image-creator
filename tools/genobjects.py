@@ -70,6 +70,9 @@ HEADER = """# Position of cube (x/y/z/SizeX/SizeY/SizeZ/Yaw/Pitch/Roll/wood.png)
 # width with the side mirrors, sizeZ its length), its front is +z of the cube and its wheels are on the floor
 # Man, Woman and Child have the same values, the standing person fills the cube of the same values (sizeX is the width
 # from hand to hand, sizeY the height), the person looks toward +z of the cube and stands on the floor
+# Car_Audi_R8=x/z/yaw/texture is the Audi R8 model car (modelsDirectory of general.ini) standing on the floor at x/z,
+# Car_Toyota_Fortuner=x/z/yaw/texture the Toyota Fortuner SUV model car the same way,
+# Car_Mercedes_SClass=x/z/yaw/texture the Mercedes-Benz S-Class (W222) sedan model car the same way
 """
 LIGHT_HEADER = """
 # Spot light (x/y/z/directionX/directionY/directionZ/InnerAngle/OuterAngle/R/G/B)

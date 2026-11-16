@@ -329,11 +329,11 @@ std::string BaseScene::getPickedText() const
     const std::string height = ", height " + mm(config.size.y) + " mm";
     switch (CameraImageSaver::getObjectClass(config.shape)) {
     case CameraImageSaver::ObjectSedan:
-        return text + ", Sedan" + carSizes;
+        return text + (config.shape == ObjectShape::MercedesSClass ? ", Mercedes-Benz S-Class sedan" : ", Sedan") + carSizes;
     case CameraImageSaver::ObjectSuv:
-        return text + ", SUV" + carSizes;
+        return text + (config.shape == ObjectShape::ToyotaFortuner ? ", Toyota Fortuner SUV" : ", SUV") + carSizes;
     case CameraImageSaver::ObjectSportCar:
-        return text + ", Sports car" + carSizes;
+        return text + (config.shape == ObjectShape::AudiR8 ? ", Audi R8 sports car" : ", Sports car") + carSizes;
     case CameraImageSaver::ObjectMan:
         return text + ", Man" + height;
     case CameraImageSaver::ObjectWoman:
@@ -420,7 +420,8 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
         const bool knownObject =
             CameraImageSaver::getObjectClass(m_listCube[i].getConfig().shape) != CameraImageSaver::ObjectUnknown;
         glUniform1f(showUnseen, m_hiddenAreas == HiddenAreas::KnownObjectsShown && knownObject ? 1.0f : 0.0f);
-        m_listCube[i].render();
+        // the distance and surface passes have the glass as solid, so the distance is on the glass
+        m_listCube[i].render(distanceFrom != nullptr);
     }
     glUniform1f(showUnseen, 0.0f);
     if (m_cameraObjectsVisible && hiddenCameraObject != NO_CAMERA_OBJECTS) {
@@ -433,8 +434,54 @@ void BaseScene::renderScene(const Matrix4x4 &projection, const Matrix4x4 &view, 
             }
         }
     }
+    if (!distanceFrom) {
+        renderGlass();
+    }
     glUniform1f(glGetUniformLocation(m_shader.generalShader(), "distancePass"), 0.0f);
     glDisable(GL_DEPTH_TEST);
+}
+
+/*!
+ * \brief BaseScene::renderGlass
+ * renders the transparent glass (the windows of the model cars) after all opaque triangles of the color pass: first
+ * blended without writing the depth, so the glass behind other glass is seen too (all glass has the same color, so
+ * the order does not matter), then only into the depth buffer, so the depth of the color image is on the glass
+ */
+void BaseScene::renderGlass()
+{
+    const int surfaceId = glGetUniformLocation(m_shader.generalShader(), "surfaceId");
+    const int showUnseen = glGetUniformLocation(m_shader.generalShader(), "showUnseen");
+    bool hasGlass = false;
+    for (int i=0;i<m_cubeCount;i++) {
+        hasGlass = hasGlass || m_listCube[i].hasGlass();
+    }
+    if (!hasGlass) {
+        return;
+    }
+    GLint oldBlendSrc, oldBlendDst;
+    glGetIntegerv(GL_BLEND_SRC_RGB, &oldBlendSrc);
+    glGetIntegerv(GL_BLEND_DST_RGB, &oldBlendDst);
+    const GLboolean oldBlend = glIsEnabled(GL_BLEND);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    for (const bool depthOnly : { false, true }) {
+        glDepthMask(depthOnly ? GL_TRUE : GL_FALSE);
+        glColorMask(!depthOnly, !depthOnly, !depthOnly, !depthOnly);
+        for (int i=0;i<m_cubeCount;i++) {
+            if (m_listCube[i].hasGlass()) {
+                glUniform1f(surfaceId, static_cast<float>(SURFACE_FIRST_CUBE + i));
+                glUniform1f(showUnseen, m_hiddenAreas == HiddenAreas::KnownObjectsShown ? 1.0f : 0.0f);
+                m_listCube[i].renderGlass();
+            }
+        }
+    }
+    glUniform1f(showUnseen, 0.0f);
+    glDepthMask(GL_TRUE);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glBlendFunc(static_cast<GLenum>(oldBlendSrc), static_cast<GLenum>(oldBlendDst));
+    if (!oldBlend) {
+        glDisable(GL_BLEND);
+    }
 }
 
 /*!
@@ -530,7 +577,8 @@ void BaseScene::createObjects()
     ObjectsConfig config;
 
     const bool success = !m_objectsDirectory.empty()
-                         && config.read((std::filesystem::path(m_objectsDirectory)/m_objectsFile).string());
+                         && config.read((std::filesystem::path(m_objectsDirectory)/m_objectsFile).string(),
+                                       m_modelsDirectory);
     // on failure ambient light is the default, so the floor is still visible
     m_ambientLight = config.getAmbientLight();
     if (!success) {
@@ -806,6 +854,7 @@ void BaseScene::setupVisualPosition()
     m_directionLine.setup(config.getDirectionLineWidth(), config.getDirectionLineHeight());
     m_outputDirectory = config.getOutputDirectory();
     m_objectsDirectory = config.getObjectsDirectory();
+    m_modelsDirectory = config.getModelsDirectory();
     m_moveSpeed = config.getMoveSpeed();
     m_moveSpeedMouseWheel = config.getMoveSpeedMouseWheel();
     m_cameraObjectsFile = config.getCameraObjectsFile();

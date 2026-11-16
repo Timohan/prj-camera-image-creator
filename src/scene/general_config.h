@@ -21,6 +21,8 @@
  * objectsFile is the file of the cubes and lights in <cameraImageOutputDirectory>/camera_objects,
  * it is objects0.dat if it is missing.
  * camerasVisible is 1 if the cameras are drawn at the start and 0 if not, it is 1 if it is missing.
+ * modelsDirectory is the directory of the model files of the model shapes of the objects files (Car_Audi_R8:
+ * <modelsDirectory>/car/audi/sport/R8.creator_obj and R8.dat), it is empty if it is missing.
  * imageOutputScale scales the resolution of the saved images (0.5 = half width and height), it is 1 if it is missing.
  */
 class GeneralConfig
@@ -45,6 +47,7 @@ public:
     const std::string &getObjectsFile() const;
     bool getCamerasVisible() const;
     float getImageOutputScale() const;
+    const std::string &getModelsDirectory() const;
 
 private:
     VECTOR3 m_basePosition;     // in opengl units
@@ -59,6 +62,7 @@ private:
     std::string m_objectsFile;
     bool m_camerasVisible;
     float m_imageOutputScale;
+    std::string m_modelsDirectory;
 };
 
 #endif // GENERAL_CONFIG_H

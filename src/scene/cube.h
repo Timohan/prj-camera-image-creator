@@ -5,6 +5,8 @@
 #include <GL/gl.h>
 #include "objects_config.h"
 
+class ModelMesh;
+
 class Cube
 {
 public:
@@ -13,7 +15,11 @@ public:
 
     void setup(const CubeConfig &config);
     int init();
-    void render();
+    // the opaque triangles, in the distance passes (opaqueGlass) also the glass as solid
+    void render(bool opaqueGlass = false);
+    // the transparent glass (the windows of the model cars), after all opaque triangles of the scene
+    void renderGlass();
+    bool hasGlass() const;
     const CubeConfig &getConfig() const;
 
 private:
@@ -25,6 +31,13 @@ private:
     GLuint m_detailTexture;
     int m_paintVerticesCount;
     int m_verticesCount;
+    // the glass vertices (transparent) are the last m_glassVerticesCount of the detail vertices
+    int m_glassVerticesCount;
+    // the model cars draw the vertex buffer of their model (no own vertices)
+    const ModelMesh *m_model;
+
+    int initTextures();
+    void setModelTransform(bool on);
 };
 
 #endif // CUBE_H

@@ -4,9 +4,10 @@ Camera image creator
 # prj-tg-ui-lib requirement
 The window, the labels and the keyboard and mouse input are from prj-tg-ui-lib
 (https://github.com/Timohan/prj-tg-ui-lib.git), it needs prj-ttf-reader (https://github.com/Timohan/prj-ttf-reader)
-and the packages libglew-dev, libpng-dev, libglfw3-dev, make and build-essential:
+and the packages libglew-dev, libpng-dev, libglfw3-dev, make and build-essential, the creator needs also
+libassimp-dev (the model files of Car_Audi_R8):
 
-    sudo apt install libglew-dev libpng-dev libglfw3-dev make build-essential
+    sudo apt install libglew-dev libpng-dev libglfw3-dev make build-essential libassimp-dev
     git clone https://github.com/Timohan/prj-ttf-reader.git
     (build and install prj-ttf-reader as told in its README)
     git clone https://github.com/Timohan/prj-tg-ui-lib.git
@@ -159,6 +160,86 @@ The body has wheel arches, a hood, a cabin and a trunk or a tailgate. The textur
 car_blue.png, car_silver.png, car_white.png and car_black.png), the windows, tires, rims, lights, grille, license
 plates and door handles have their own colors. A car is one surface number in the data files. The objects file lists
 the cars after the cones: the cars, the SUVs and then the sports cars. tools/genobjects.py places 0-30 random cars.
+
+## Cars of model files (Car_Audi_R8, Car_Toyota_Fortuner)
+`Car_Audi_R8=x/z/yaw/texture` is an Audi R8 sports car and `Car_Toyota_Fortuner=x/z/yaw/texture` a Toyota Fortuner
+SUV of 3D model files in modelsDirectory of configs/general.ini, loaded with assimp (src/scene/model_mesh.cpp) and
+scaled to their real length, Length=<mm> of the measure file:
+
+| Key | Model file | Measure file | Class in the data files | Box (mm) |
+|---|---|---|---|---|
+| `Car_Audi_R8` | car/audi/sport/R8.creator_obj (simplified r8.obj, see below) | car/audi/sport/R8.dat | sports car (5) | 1968 x 1201 x 4429 |
+| `Car_Toyota_Fortuner` | car/toyota/suv/Fortuner.creator_obj (simplified Fortuner.obj, see below) | car/toyota/suv/Fortuner.dat | SUV (4) | 2073 x 1701 x 4795 |
+| `Car_Mercedes_SClass` | car/mercedes-benz/sedan/SClass.creator_obj (MB.W222.AMG.obj converted) | car/mercedes-benz/sedan/SClass.dat | sedan (3) | 2066 x 1451 x 5145 |
+
+The car stands on the floor, x/z (mm) is its middle and yaw (degrees) turns its front from +z toward +x like the
+other cars, for example (examples in /mnt/cameras/camera_objects/objects11.dat, objects12.dat and objects13.dat)
+
+    Car_Audi_R8=0/6000/35/car_red.png
+    Car_Toyota_Fortuner=0/6500/35/car_silver.png
+    Car_Mercedes_SClass=0/6500/35/car_black.png
+
+The texture is the paint of the body (the paint parts of the model: "body color" of the R8, the "carpaint" and
+"Car_Paint" materials of the Fortuner), the other parts have the colors of their materials (the .mtl file, materials
+with a texture image get the color of their name, for example "black" or "rim"). The windows are transparent glass
+drawn after all opaque objects: the "glass window" and "glass lamp" parts of the R8 (35 % dark glass, the R8
+materials have no transparency, the lamps and the red LED strips of the tail lights are seen through the lamp glass) and the transparent materials of the .mtl file (d < 1: the windows of the Fortuner, 50 % black glass,
+and its lamp glasses), the interior of the car (seats, dashboard) is seen through them. The distances, the normals
+and the surface numbers of the data files are on the glass (the data files are the same as with solid windows), a
+click on a window shows the car ("Audi R8 sports car" or "Toyota Fortuner SUV" and the box), and the glass does not
+cast shadows. The model files are right-handed, they are mirrored in x into the left-handed scene, so the car is not
+a mirror image. Its cube is the box of the model (center at half its height), the objects file lists the model cars
+after the children.
+
+Every model is loaded once per process and all of its cars draw the same vertex buffer (the shader turns and moves
+it, useRotation/transformRotation), so many cars of a model use the GPU memory of one. A model file that assimp reads
+(obj...) is saved after its first load to ~/.cache/prj-camera-image-creator/<model name>-<hash>.mesh and the next
+processes read it in a moment (the hash is of the paths, sizes and change times of the model, material and measure
+files, so a changed file is loaded again and the old cache file is removed).
+
+### Simplified models (.own_obj, .creator_obj)
+The detailed models are simplified and saved in the own format of the creator, .own_obj or .creator_obj (the same
+format, read in a moment, no cache file):
+
+| File | Triangles | Size | From | Made with |
+|---|---|---|---|---|
+| R8.creator_obj | 40008 | 4.6 MB | r8.obj, 72202 triangles, 17 MB (removed) | `40000 --interiorWeight=0.25 --areaPower=0.5` |
+| Fortuner.creator_obj | 59004 | 5 MB | Fortuner.obj, 6.26 million triangles, 547 MB (removed) | `48500 --interiorWeight=0.25` |
+| SClass.creator_obj | 27808 | 1.2 MB | MB.W222.AMG.obj, 27832 triangles (13362 quads, removed) | converted as it is (--convertModel) |
+
+Both keep the shape of the car. The Fortuner keeps most details, its logo and some thin trims are a little rougher
+than in the original. The R8 with 40008 triangles has faint and broken Audi rings, a thinner chrome outline of the
+grille and a few dark gaps at the edges of the doors (with 59984 triangles, `60000`, they were nearly like the
+original). Fortuner.obj was much too detailed (most triangles in its wheels), so it was simplified by the surface area
+(--areaPower 1, the default); with 40785 triangles (`29000 --interiorWeight=0.25`) its logo was distorted, the chrome
+strips broken and some gaps opened at the edges of the panels. The R8 lost only 17 %, `--areaPower=0.5` keeps the
+share of its small detailed parts (logos, chrome) and of its body (by area 1 the logos were faint, by triangles 0 the
+body showed flat facets). The Mercedes S-Class (MB.W222.AMG.obj) has only 27832 triangles and smooth normals, it is converted as it is: subdivided once
+(`--subdivide=1`, 111012 triangles) and decimated to 60000 its window frames were torn and black lines opened at the
+panel gaps. Its lights, grille, badges and plates and its tires had texture images in MB.W222.AMG.mtl that were not
+there (MB_W222_Photo_Textures.1001.png, Tire_Wheel_BaseColor.png), they get the colors of their names (grey, the
+tires black), so the tail lights are light grey instead of red. To use another file, change the file of MODEL_FILES
+in src/scene/model_mesh.cpp.
+
+1. tools/simplify_model.py simplifies the model with Blender (headless): every object and material gets a share of
+   the triangles by its surface area (at least 16, the dense small parts like wheel bolts lose the most, the large
+   body panels keep their shape) and is decimated to it (Decimate modifier, collapse), the normals are smooth inside
+   the surfaces and sharp at the edges of over 30 degrees. The output obj has the same object and material names and
+   the mtllib of the input, so the material file of the input (linked or copied next to it) gives its colors:
+
+       ln -s /home/timo/home/models/car/toyota/suv/Fortuner.mtl /tmp/simplify/Fortuner.mtl
+       blender -b --factory-startup -P tools/simplify_model.py -- /home/timo/home/models/car/toyota/suv/Fortuner.obj /tmp/simplify/Fortuner_low.obj 48500 --interiorWeight=0.25
+
+2. The creator converts it (assimp and the material file) into .own_obj:
+
+       ./prj-camera-image-creator --convertModel=/tmp/simplify/Fortuner_low.obj --output=/home/timo/home/models/car/toyota/suv/Fortuner.creator_obj
+
+.own_obj (little-endian binary, src/scene/model_mesh.cpp): char[4] "OOBJ", uint32 version (1), uint32 count of the
+parts, then every part (a mesh of one material): uint32 length and the characters of its name and of its material
+name, float diffuse r/g/b (Kd), uint8 has diffuse, float opacity (d), uint8 has texture (map_Kd), uint32 vertex
+count, uint32 triangle count, float x/y/z of the vertices, float normal x/y/z, float s/t, uint32 3 vertices of every
+triangle. The coordinates are those of the model file (its units and axes, y up, front +z); the paint, glass and
+colors come from the part and material names and values like from an obj file.
 
 examples/objects_people.dat has standing men (Man), women (Woman) and children (Child) around the cameras and a car
 next to them:

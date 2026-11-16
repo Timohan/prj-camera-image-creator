@@ -1,20 +1,24 @@
 #include "objects_config.h"
 #include "ini_file.h"
 #include "global_log.h"
+#include "model_mesh.h"
 #include <utility>
 
 #define MM_TO_OPENGL_UNIT   1000.0f
 // x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll before the texture
 #define CUBE_VALUE_COUNT    9
+// model shapes: x/z/yaw before the texture
+#define MODEL_VALUE_COUNT   3
 // x/y/z/directionX/directionY/directionZ/innerAngle/outerAngle/r/g/b
 #define SPOT_LIGHT_VALUE_COUNT  11
 
 /*!
  * \brief ObjectsConfig::read
  * \param filename full path of the objects file
+ * \param modelsDirectory directory of the model files of the model shapes (Car_Audi_R8)
  * \return true on success, on failure the cube and spot light lists are empty
  */
-bool ObjectsConfig::read(const std::string &filename)
+bool ObjectsConfig::read(const std::string &filename, const std::string &modelsDirectory)
 {
     IniFile ini;
     std::vector<CubeConfig> listCube;
@@ -52,6 +56,33 @@ bool ObjectsConfig::read(const std::string &filename)
             cube.yaw = values[6];
             cube.pitch = values[7];
             cube.roll = values[8];
+            listCube.push_back(cube);
+        }
+    }
+    // the model shapes stand on the floor, their cube is the box of the model
+    for (const ObjectShape shape : ModelMesh::getModelShapes()) {
+        const std::string key = ModelMesh::getObjectsFileKey(shape);
+        for (const std::string &value : ini.getValues(key)) {
+            CubeConfig cube;
+            float values[MODEL_VALUE_COUNT];
+            const size_t textureBegin = value.rfind('/');
+
+            if (textureBegin == std::string::npos
+                || !IniFile::parseFloats(value.substr(0, textureBegin), values, MODEL_VALUE_COUNT)
+                || textureBegin + 1 >= value.size()) {
+                TG_ERROR_LOG(filename + ": " + key + "=" + value, "is invalid, it must be x/z/yaw/texture");
+                return false;
+            }
+            const ModelMesh *model = ModelMesh::get(shape, modelsDirectory);
+            if (!model) {
+                TG_ERROR_LOG(filename + ": " + key + "=" + value, "cannot be drawn, its model is not loaded");
+                return false;
+            }
+            cube.shape = shape;
+            cube.texture = value.substr(textureBegin + 1);
+            cube.size = model->getSize();
+            cube.position = { values[0]/MM_TO_OPENGL_UNIT, cube.size.y/2.0f, values[1]/MM_TO_OPENGL_UNIT };
+            cube.yaw = values[2];
             listCube.push_back(cube);
         }
     }

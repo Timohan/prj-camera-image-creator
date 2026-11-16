@@ -37,14 +37,16 @@ const char *CameraShader::m_vertShader = "attribute vec3 vertex;" \
         "uniform mat4 view;" \
         "uniform mat4 projection;" \
         "uniform vec3 transformPosition;" \
+        "uniform float useRotation;" \
+        "uniform mat3 transformRotation;" \
         "uniform float earthRadius;" \
         "uniform float earthCurve;" \
         "void main()" \
         "{" \
         "    texCoord                = tex_coord;" \
         "    colorLight              = color;" \
-        "    vec3 pos                = transformPosition+vertex;" \
-        "    vec3 nor                = normal;" \
+        "    vec3 pos                = transformPosition+(useRotation > 0.5 ? transformRotation*vertex : vertex);" \
+        "    vec3 nor                = useRotation > 0.5 ? transformRotation*normal : normal;" \
         "    float r                 = length(pos.xz);" \
         "    if (earthCurve > 0.5 && r > 0.0) {" \
         "        vec2 dir            = pos.xz/r;" \

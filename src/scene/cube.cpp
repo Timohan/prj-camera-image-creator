@@ -1,6 +1,7 @@
 #include "cube.h"
 #include "car_mesh.h"
 #include "human_mesh.h"
+#include "model_mesh.h"
 #include "../shader/camera_shader.h"
 #include <application/tg_application.h>
 #include <string>
@@ -41,7 +42,9 @@ Cube::Cube() :
     m_textureIndex(0),
     m_detailTexture(0),
     m_paintVerticesCount(0),
-    m_verticesCount(0)
+    m_verticesCount(0),
+    m_glassVerticesCount(0),
+    m_model(nullptr)
 {
 }
 
@@ -195,11 +198,19 @@ int Cube::init()
     // cars and people are generated meshes, the other shapes are made here
     const bool isMesh = m_config.shape == ObjectShape::Car || m_config.shape == ObjectShape::Suv
             || m_config.shape == ObjectShape::SportCar || m_config.shape == ObjectShape::Man
-            || m_config.shape == ObjectShape::Woman || m_config.shape == ObjectShape::Child;
+            || m_config.shape == ObjectShape::Woman || m_config.shape == ObjectShape::Child
+            || ModelMesh::isModelShape(m_config.shape);
     if (isMesh) {
         // the paint first (texture of the object), then the details (white texture, their vertex colors)
         std::vector<MeshVertex> paint, detail;
-        if (m_config.shape == ObjectShape::Man || m_config.shape == ObjectShape::Woman
+        if (ModelMesh::isModelShape(m_config.shape)) {
+            // all cars of the model draw its one vertex buffer, render() turns and moves it in the shader
+            m_model = ModelMesh::get(m_config.shape, std::string());
+            if (!m_model || m_model->upload()) {
+                return 1;
+            }
+            return initTextures();
+        } else if (m_config.shape == ObjectShape::Man || m_config.shape == ObjectShape::Woman
                 || m_config.shape == ObjectShape::Child) {
             const HumanType type = m_config.shape == ObjectShape::Woman ? HumanType::Woman
                     : (m_config.shape == ObjectShape::Child ? HumanType::Child : HumanType::Man);
@@ -308,6 +319,16 @@ int Cube::init()
     glEnableVertexAttribArray(CameraShader::m_shaderAttributeIndex[ShaderAttributes3d::AttribColor]);
     glBindVertexArray(0);
 
+    return initTextures();
+}
+
+/*!
+ * \brief Cube::initTextures
+ * loads the texture of the object and creates the white texture of the details
+ * \return 0 on success
+ */
+int Cube::initTextures()
+{
     m_textureIndex = getApplication()->getTextureIndex((std::string(IMAGES_PATH) + m_config.texture).c_str());
     if (!m_textureIndex) {
         return 1;
@@ -318,7 +339,7 @@ int Cube::init()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
-    if (m_paintVerticesCount < m_verticesCount) {
+    if (m_paintVerticesCount < m_verticesCount || m_model) {
         const unsigned char white[4] = { 255, 255, 255, 255 };
         glGenTextures(1, &m_detailTexture);
         glBindTexture(GL_TEXTURE_2D, m_detailTexture);
@@ -330,8 +351,19 @@ int Cube::init()
     return 0;
 }
 
-void Cube::render()
+/*!
+ * \brief Cube::render
+ * \param opaqueGlass true in the distance and surface passes: the glass is solid (the distance is on the glass), false
+ * in the color pass: the glass is not rendered, renderGlass() renders it after all opaque triangles
+ */
+void Cube::render(bool opaqueGlass)
 {
+    if (m_model) {
+        setModelTransform(true);
+        m_model->drawOpaque(opaqueGlass, m_textureIndex, m_detailTexture);
+        setModelTransform(false);
+        return;
+    }
     glBindVertexArray(m_vertexArrayObject);
     glEnable(GL_TEXTURE_2D);
     glActiveTexture(GL_TEXTURE0);
@@ -342,8 +374,78 @@ void Cube::render()
     glBindTexture(GL_TEXTURE_2D, m_textureIndex);
     glDrawArrays(GL_TRIANGLES, 0, m_paintVerticesCount);
     if (m_detailTexture) {
+        const int count = m_verticesCount - m_paintVerticesCount - (opaqueGlass ? 0 : m_glassVerticesCount);
         glBindTexture(GL_TEXTURE_2D, m_detailTexture);
-        glDrawArrays(GL_TRIANGLES, m_paintVerticesCount, m_verticesCount - m_paintVerticesCount);
+        glDrawArrays(GL_TRIANGLES, m_paintVerticesCount, count);
     }
+    glBindVertexArray(0);
+}
+
+bool Cube::hasGlass() const
+{
+    return m_glassVerticesCount > 0 || (m_model && m_model->hasGlass());
+}
+
+/*!
+ * \brief Cube::setModelTransform
+ * a model car: on sets the rotation (roll, pitch and yaw like the vertices of the other objects) and the position of
+ * the car to the shader, off sets them back (no rotation, position 0/0/0)
+ */
+void Cube::setModelTransform(bool on)
+{
+    GLint program = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+    const GLuint shader = static_cast<GLuint>(program);
+    if (!on) {
+        glUniform1f(glGetUniformLocation(shader, "useRotation"), 0.0f);
+        glUniform3f(glGetUniformLocation(shader, "transformPosition"), 0.0f, 0.0f, 0.0f);
+        return;
+    }
+    const float yaw = m_config.yaw*PI_VALUE/180.0f;
+    const float pitch = m_config.pitch*PI_VALUE/180.0f;
+    const float roll = m_config.roll*PI_VALUE/180.0f;
+    // the columns are the turned x, y and z axes (the same rotation as Cube::init)
+    auto rotate = [=](const float c[3], float *out) {
+        const float rollX = c[0]*cosf(roll) + c[1]*sinf(roll);
+        const float rollY = -c[0]*sinf(roll) + c[1]*cosf(roll);
+        const float pitchY = rollY*cosf(pitch) + c[2]*sinf(pitch);
+        const float pitchZ = -rollY*sinf(pitch) + c[2]*cosf(pitch);
+        out[0] = rollX*cosf(yaw) + pitchZ*sinf(yaw);
+        out[1] = pitchY;
+        out[2] = -rollX*sinf(yaw) + pitchZ*cosf(yaw);
+    };
+    const float axes[3][3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
+    float matrix[9];
+    for (int i=0;i<3;i++) {
+        rotate(axes[i], matrix + 3*i);
+    }
+    glUniformMatrix3fv(glGetUniformLocation(shader, "transformRotation"), 1, GL_FALSE, matrix);
+    glUniform1f(glGetUniformLocation(shader, "useRotation"), 1.0f);
+    glUniform3f(glGetUniformLocation(shader, "transformPosition"), m_config.position.x, m_config.position.y,
+                m_config.position.z);
+}
+
+/*!
+ * \brief Cube::renderGlass
+ * renders the glass with the blending of its alpha (the blending and the depth writing are set by the caller)
+ */
+void Cube::renderGlass()
+{
+    if (m_model) {
+        if (m_model->hasGlass()) {
+            setModelTransform(true);
+            m_model->drawGlass(m_detailTexture);
+            setModelTransform(false);
+        }
+        return;
+    }
+    if (!m_glassVerticesCount) {
+        return;
+    }
+    glBindVertexArray(m_vertexArrayObject);
+    glEnable(GL_TEXTURE_2D);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_detailTexture);
+    glDrawArrays(GL_TRIANGLES, m_verticesCount - m_glassVerticesCount, m_glassVerticesCount);
     glBindVertexArray(0);
 }

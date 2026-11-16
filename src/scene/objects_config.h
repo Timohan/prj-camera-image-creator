@@ -21,6 +21,12 @@ enum class ObjectShape
                 // his depth, he looks toward +z and stands on the bottom of the cube (-y)
     Woman,      // standing woman that fills the cube like the man: T-shirt, knee-length skirt and long hair
     Child,      // standing child (about 7 years) that fills the cube like the man: T-shirt, shorts and sneakers
+    AudiR8,     // Audi R8 sports car of the model file <modelsDirectory>/car/audi/sport/R8.creator_obj (model_mesh.h) in the
+                // cube of its size (the length of R8.dat) like the car, standing on the floor
+    ToyotaFortuner, // Toyota Fortuner SUV of the model file <modelsDirectory>/car/toyota/suv/Fortuner.creator_obj like the
+                    // Audi R8 (the length of Fortuner.dat)
+    MercedesSClass,   // Mercedes-Benz S-Class (W222 AMG) sedan of the model file
+                    // <modelsDirectory>/car/mercedes-benz/sedan/SClass.creator_obj like the Audi R8
 };
 
 struct CubeConfig
@@ -61,6 +67,15 @@ struct SpotLightConfig
  * its front is +z of the cube and its wheels touch the bottom of the cube (-y). The texture is its paint, the
  * windows, tires, rims, lights, grille and license plates have their own colors.
  * Every SUV is written as Suv=... and every sports car as SportCar=... with the same values as the car.
+ * Every Audi R8 is written as Car_Audi_R8=x/z/yaw/texture: the Audi R8 of the model file
+ * <modelsDirectory of general.ini>/car/audi/sport/R8.creator_obj (simplified r8.obj) in its real size (Length of R8.dat of the same folder)
+ * stands on the floor at x/z (mm, the middle of the car) with its front turned yaw degrees from +z to +x, the texture
+ * is its paint, the other parts have the colors of the materials of the model. Its cube is the box of the model
+ * (center at the half height of the car) like the cube of the car.
+ * Every Toyota Fortuner SUV is written as Car_Toyota_Fortuner=x/z/yaw/texture like the Audi R8, its model file is
+ * <modelsDirectory>/car/toyota/suv/Fortuner.creator_obj (simplified Fortuner.obj) and its length is in Fortuner.dat.
+ * Every Mercedes-Benz S-Class (W222 AMG) sedan is written as Car_Mercedes_SClass=x/z/yaw/texture like the Audi R8, its
+ * model file is <modelsDirectory>/car/mercedes-benz/sedan/SClass.creator_obj and its length in SClass.dat.
  * Every man is written as Man=x/y/z/sizeX/sizeY/sizeZ/yaw/pitch/roll/texture with the same values: a standing man
  * (his arms down at his sides) fills the cube of the same values, sizeX is his width from hand to hand, sizeY his
  * height and sizeZ his depth (from his back to his toes), he looks toward +z of the cube and stands on its bottom
@@ -68,7 +83,7 @@ struct SpotLightConfig
  * Every woman (1.65 m, 490/1650/300 keeps her proportions) is written as Woman=... and every child (1.20 m,
  * 360/1200/215) as Child=... with the same values as the man (560/1800/310), the texture is the shirt.
  * The list has the cubes first, then the balls, the cylinders, the cones, the cars, the SUVs, the sports cars, the
- * men, the women and the children.
+ * men, the women, the children, the Audi R8s, the Toyota Fortuners and the Mercedes S-Classes.
  * Every spot light is written as
  * SpotLight=x/y/z/directionX/directionY/directionZ/innerAngle/outerAngle/r/g/b,
  * position is in mm, angles in degrees. AmbientLight=r/g/b is optional.
@@ -76,7 +91,8 @@ struct SpotLightConfig
 class ObjectsConfig
 {
 public:
-    bool read(const std::string &filename);
+    // modelsDirectory: the models of the model shapes (Car_Audi_R8), modelsDirectory of general.ini
+    bool read(const std::string &filename, const std::string &modelsDirectory = std::string());
 
     int getCubeCount() const;
     const CubeConfig &getCube(int index) const;
